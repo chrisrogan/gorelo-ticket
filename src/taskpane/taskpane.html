@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gorelo Ticket</title>
+  <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="taskpane.css" />
+</head>
+<body>
+  <!-- ── Header ─────────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-inner">
+      <img src="../../assets/gorelo-logo.svg" alt="Gorelo" class="logo" />
+      <span class="header-title">Gorelo Ticket</span>
+      <button class="btn-icon" id="btn-settings" title="Settings" aria-label="Settings">⚙</button>
+    </div>
+  </header>
+
+  <!-- ── Auth banner (shown when not logged in) ─────────────────── -->
+  <div id="auth-banner" class="banner banner--warn hidden">
+    <span>Not connected to Gorelo.</span>
+    <button class="btn-link" id="btn-login">Sign in</button>
+  </div>
+
+  <!-- ── Status message ─────────────────────────────────────────── -->
+  <div id="status-message" class="status-message hidden"></div>
+
+  <!-- ── Main form: Create Ticket ──────────────────────────────── -->
+  <main id="view-create" class="view">
+
+    <div class="form-section">
+      <!-- Original sender info (read-only, from email) -->
+      <div class="field-group">
+        <label class="label">From</label>
+        <div class="from-display" id="from-display">
+          <span id="from-name" class="from-name">—</span>
+          <span id="from-email" class="from-email"></span>
+        </div>
+      </div>
+
+      <!-- Subject / Ticket title -->
+      <div class="field-group">
+        <label class="label" for="field-title">Subject <span class="required">*</span></label>
+        <input type="text" id="field-title" class="input" placeholder="Ticket title" />
+      </div>
+    </div>
+
+    <div class="form-section">
+      <!-- Client -->
+      <div class="field-group">
+        <label class="label" for="field-client">Client</label>
+        <select id="field-client" class="select">
+          <option value="">Loading…</option>
+        </select>
+      </div>
+
+      <!-- Contact (filtered by client) -->
+      <div class="field-group">
+        <label class="label" for="field-contact">Contact</label>
+        <select id="field-contact" class="select">
+          <option value="">Select client first</option>
+        </select>
+      </div>
+
+      <!-- Group (required by Gorelo) -->
+      <div class="field-group">
+        <label class="label" for="field-group">Group <span class="required">*</span></label>
+        <select id="field-group" class="select">
+          <option value="">Loading…</option>
+        </select>
+      </div>
+
+      <!-- Assignee -->
+      <div class="field-group">
+        <label class="label" for="field-assignee">Assignee</label>
+        <select id="field-assignee" class="select">
+          <option value="0">Unassigned</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-section form-section--row">
+      <!-- Priority -->
+      <div class="field-group field-group--half">
+        <label class="label" for="field-priority">Priority</label>
+        <select id="field-priority" class="select">
+          <option value="4">Urgent</option>
+          <option value="1">High</option>
+          <option value="2" selected>Normal</option>
+          <option value="3">Low</option>
+        </select>
+      </div>
+
+      <!-- Source -->
+      <div class="field-group field-group--half">
+        <label class="label" for="field-source">Source</label>
+        <select id="field-source" class="select">
+          <option value="2" selected>Email</option>
+          <option value="1">Web</option>
+          <option value="3">Phone</option>
+          <option value="4">Chat</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <!-- Tags -->
+      <div class="field-group">
+        <label class="label">Tags</label>
+        <div id="tag-container" class="tag-container">
+          <div id="tag-chips" class="tag-chips"></div>
+          <select id="field-tags" class="select select--tags">
+            <option value="">Add tag…</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Asset -->
+      <div class="field-group">
+        <label class="label" for="field-asset">Asset</label>
+        <select id="field-asset" class="select">
+          <option value="">None</option>
+        </select>
+      </div>
+
+      <!-- Additional notes -->
+      <div class="field-group">
+        <label class="label" for="field-notes">Additional Notes</label>
+        <textarea id="field-notes" class="textarea" rows="3"
+          placeholder="Optional notes to prepend to the ticket…"></textarea>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <!-- Email configuration -->
+      <div class="field-group">
+        <label class="label" for="field-emailconfig">Inbound Mailbox</label>
+        <select id="field-emailconfig" class="select">
+          <option value="">Loading…</option>
+        </select>
+      </div>
+
+      <!-- Send notification toggle -->
+      <div class="field-group field-group--toggle">
+        <label class="label" for="field-notify">Send ticket created email</label>
+        <input type="checkbox" id="field-notify" class="toggle" checked />
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="actions">
+      <button id="btn-create" class="btn btn--primary">Create Ticket</button>
+      <button id="btn-cancel" class="btn btn--secondary">Cancel</button>
+    </div>
+  </main>
+
+  <!-- ── Settings view ──────────────────────────────────────────── -->
+  <main id="view-settings" class="view hidden">
+    <div class="settings-header">
+      <button class="btn-back" id="btn-back">← Back</button>
+      <h2 class="settings-title">Settings</h2>
+    </div>
+
+    <div class="form-section">
+      <p class="help-text">
+        These defaults are used for Quick Create (one-click). You can override
+        them per-ticket in the main form.
+      </p>
+
+      <div class="field-group">
+        <label class="label" for="s-emailconfig">Default Inbound Mailbox</label>
+        <select id="s-emailconfig" class="select">
+          <option value="">Loading…</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label class="label" for="s-group">Default Group</label>
+        <select id="s-group" class="select">
+          <option value="">Loading…</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label class="label" for="s-assignee">Default Assignee</label>
+        <select id="s-assignee" class="select">
+          <option value="0">Unassigned</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label class="label" for="s-priority">Default Priority</label>
+        <select id="s-priority" class="select">
+          <option value="4">Urgent</option>
+          <option value="1">High</option>
+          <option value="2" selected>Normal</option>
+          <option value="3">Low</option>
+        </select>
+      </div>
+
+      <div class="field-group field-group--toggle">
+        <label class="label" for="s-autopane">Always open task pane (disable quick create)</label>
+        <input type="checkbox" id="s-autopane" class="toggle" />
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="field-group">
+        <label class="label">Gorelo Account</label>
+        <div id="account-info" class="account-info">Not signed in</div>
+        <button class="btn btn--secondary btn--sm" id="btn-signout">Sign out</button>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="btn-save-settings" class="btn btn--primary">Save Settings</button>
+    </div>
+  </main>
+
+  <script type="module" src="taskpane.js"></script>
+</body>
+</html>

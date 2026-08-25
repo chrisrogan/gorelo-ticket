@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Gorelo Ticket - Auth</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library/3.11.0/msal-browser.min.js"></script>
+</head>
+<body>
+  <script>
+    // This page handles the redirect response from Azure AD B2C.
+    // MSAL will process the URL hash and close this window automatically.
+    const msalInstance = new msal.PublicClientApplication({
+      auth: {
+        clientId: '6a628336-23e6-4bcf-b6b2-c16af729a828',
+        authority: 'https://login.gorelo.io/5860777d-7a0c-4a21-926b-91762e9a662c/b2c_1a_gorelo_susi_totp_dev',
+        knownAuthorities: ['login.gorelo.io'],
+      },
+      cache: { cacheLocation: 'localStorage' },
+    });
+    msalInstance.initialize().then(() => {
+      msalInstance.handleRedirectPromise().catch(console.error);
+    });
+  </script>
+</body>
+</html>

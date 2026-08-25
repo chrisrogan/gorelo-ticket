@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+  xsi:type="MailApp">
+
+  <!-- ═══ Identity ═══════════════════════════════════════════════ -->
+  <!-- Generate a new GUID for your deployment: https://guidgenerator.com -->
+  <Id>a1b2c3d4-e5f6-7890-abcd-ef1234567890</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Gorelo Ticket</ProviderName>
+  <DefaultLocale>en-GB</DefaultLocale>
+  <DisplayName DefaultValue="Gorelo Ticket" />
+  <Description DefaultValue="Create Gorelo tickets directly from Outlook emails." />
+
+  <!-- ═══ Icons ══════════════════════════════════════════════════ -->
+  <IconUrl DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/assets/icon-64.png" />
+  <HighResolutionIconUrl DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/assets/icon-128.png" />
+  <SupportUrl DefaultValue="https://github.com/REPLACE_WITH_YOUR_GITHUB/gorelo-ticket" />
+
+  <!-- ═══ Permissions ════════════════════════════════════════════ -->
+  <Permissions>ReadWriteItem</Permissions>
+
+  <!-- ═══ Activation rules ═══════════════════════════════════════ -->
+  <!-- Show on any email message (read mode) -->
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read" />
+  </Rule>
+
+  <!-- ═══ Version overrides (modern Outlook) ═════════════════════ -->
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides"
+    xsi:type="VersionOverridesV1_0">
+
+    <Requirements>
+      <bt:Sets DefaultMinVersion="1.3">
+        <bt:Set Name="Mailbox" />
+      </bt:Sets>
+    </Requirements>
+
+    <Hosts>
+      <Host xsi:type="MailHost">
+        <DesktopFormFactor>
+
+          <!-- Function file for quick-create command -->
+          <FunctionFile resid="Commands.Url" />
+
+          <!-- ── Reading pane extension point ── -->
+          <ExtensionPoint xsi:type="MessageReadCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="gorelo.group">
+                <Label resid="GroupLabel" />
+
+                <!-- Quick Create button (one click) -->
+                <Control xsi:type="Button" id="gorelo.quickCreate">
+                  <Label resid="QuickCreateLabel" />
+                  <Supertip>
+                    <Title resid="QuickCreateLabel" />
+                    <Description resid="QuickCreateTooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16" />
+                    <bt:Image size="32" resid="Icon.32x32" />
+                    <bt:Image size="80" resid="Icon.80x80" />
+                  </Icon>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>quickCreateTicket</FunctionName>
+                  </Action>
+                </Control>
+
+                <!-- Open Task Pane button -->
+                <Control xsi:type="Button" id="gorelo.taskPane">
+                  <Label resid="TaskPaneLabel" />
+                  <Supertip>
+                    <Title resid="TaskPaneLabel" />
+                    <Description resid="TaskPaneTooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16" />
+                    <bt:Image size="32" resid="Icon.32x32" />
+                    <bt:Image size="80" resid="Icon.80x80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="TaskPane.Url" />
+                    <SupportsPinning>true</SupportsPinning>
+                  </Action>
+                </Control>
+
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <!-- ═══ Resources ══════════════════════════════════════════════ -->
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/assets/icon-16.png" />
+        <bt:Image id="Icon.32x32" DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/assets/icon-32.png" />
+        <bt:Image id="Icon.80x80" DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/assets/icon-80.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Commands.Url" DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/src/commands/commands.html" />
+        <bt:Url id="TaskPane.Url" DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/src/taskpane/taskpane.html" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GroupLabel" DefaultValue="Gorelo Ticket" />
+        <bt:String id="QuickCreateLabel" DefaultValue="Quick Create" />
+        <bt:String id="TaskPaneLabel" DefaultValue="Create Ticket…" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="QuickCreateTooltip" DefaultValue="Instantly create a Gorelo ticket from this email using your default settings." />
+        <bt:String id="TaskPaneTooltip" DefaultValue="Open the Gorelo Ticket pane to create a ticket with full options — client, group, priority, tags, and more." />
+      </bt:LongStrings>
+    </Resources>
+
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1"
+      xsi:type="VersionOverridesV1_1">
+      <!-- Outlook on the web / new Outlook inherits from above -->
+    </VersionOverrides>
+
+  </VersionOverrides>
+</OfficeApp>

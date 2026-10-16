@@ -13,8 +13,8 @@
   <DisplayName DefaultValue="Gorelo Ticket"/>
   <Description DefaultValue="Create Gorelo PSA tickets directly from emails — quick create and full task pane with client/contact auto-match."/>
 
-  <IconUrl DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/assets/icon-64.png"/>
-  <HighResolutionIconUrl DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/assets/icon-128.png"/>
+  <IconUrl DefaultValue="https://chrisrogan.github.io/gorelo-ticket/assets/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://chrisrogan.github.io/gorelo-ticket/assets/icon-128.png"/>
   <SupportUrl DefaultValue="https://github.com/unl3ash3dit/gorelo-ticket"/>
 
   <AppDomains>
@@ -35,7 +35,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/src/taskpane/taskpane.html"/>
+        <SourceLocation DefaultValue="https://chrisrogan.github.io/gorelo-ticket/src/taskpane/taskpane.html"/>
         <RequestedHeight>450</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -113,13 +113,13 @@
 
       <Resources>
         <bt:Images>
-          <bt:Image id="Icon16" DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/assets/icon-16.png"/>
-          <bt:Image id="Icon32" DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/assets/icon-32.png"/>
-          <bt:Image id="Icon80" DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/assets/icon-80.png"/>
+          <bt:Image id="Icon16" DefaultValue="https://chrisrogan.github.io/gorelo-ticket/assets/icon-16.png"/>
+          <bt:Image id="Icon32" DefaultValue="https://chrisrogan.github.io/gorelo-ticket/assets/icon-32.png"/>
+          <bt:Image id="Icon80" DefaultValue="https://chrisrogan.github.io/gorelo-ticket/assets/icon-80.png"/>
         </bt:Images>
         <bt:Urls>
-          <bt:Url id="FunctionFile.Url" DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/src/commands/commands.html"/>
-          <bt:Url id="Taskpane.Url" DefaultValue="REPLACE_WITH_YOUR_HOSTING_URL/src/taskpane/taskpane.html"/>
+          <bt:Url id="FunctionFile.Url" DefaultValue="https://chrisrogan.github.io/gorelo-ticket/src/commands/commands.html"/>
+          <bt:Url id="Taskpane.Url" DefaultValue="https://chrisrogan.github.io/gorelo-ticket/src/taskpane/taskpane.html"/>
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="Gorelo"/>

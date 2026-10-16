@@ -1,467 +1,507 @@
-/**
- * Gorelo Ticket - Task Pane UI
- * Handles the main create-ticket form and settings view.
- */
+/* taskpane.js — Full task pane controller.
+   Handles the Create Ticket form and Settings view. */
 
-/* global Office */
-
-import { initAuth, getToken, getCurrentAccount, signOut, isAuthenticated } from '../auth/auth.js';
+import { isAuthenticated, validateApiKey } from '../auth/auth.js';
 import {
   getClients, getContacts, getTechnicianGroups, getTechnicians,
-  getTags, getAssets, getEmailConfigurations, createTicket,
+  getTags, getEmailConfigurations, createTicket,
+  PRIORITIES, SOURCES,
 } from '../gorelo-api.js';
-import { getSetting, setSetting, saveSettings, getAllSettings } from '../settings.js';
+import { getSetting, saveSettings, getAllSettings } from '../settings.js';
 
-// ─── State ────────────────────────────────────────────────────────
-let allClients = [];
-let allContacts = [];
-let allGroups = [];
-let allTechnicians = [];
+// ─── State ────────────────────────────────────────────────────────────────────
+
 let allTags = [];
-let allAssets = [];
-let allEmailConfigs = [];
-let selectedTagIds = [];
-let currentEmail = null;
+let selectedTags = [];          // { id, name } objects; id may be null for new tags
+let currentView = 'form';       // 'form' | 'settings' | 'setup'
 
-// ─── DOM refs ─────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
+// ─── Boot ─────────────────────────────────────────────────────────────────────
 
-// ─── Init ─────────────────────────────────────────────────────────
 Office.onReady(async () => {
   try {
-    await initAuth();
-    wireUpEvents();
-
-    if (isAuthenticated()) {
-      await loadEmailData();
-      await loadDropdowns();
-      updateAccountInfo();
+    if (!isAuthenticated()) {
+      showView('setup');
     } else {
-      showAuthBanner();
+      showView('form');
+      await Promise.all([loadFormDropdowns(), loadEmailData()]);
     }
   } catch (err) {
-    showStatus('Initialisation error: ' + err.message, 'error');
+    console.error('[Gorelo] Init error', err);
+    showView('form');
   }
 });
 
-// ─── Event wiring ─────────────────────────────────────────────────
-function wireUpEvents() {
-  $('btn-settings').addEventListener('click', () => showView('settings'));
-  $('btn-back').addEventListener('click', () => showView('create'));
-  $('btn-cancel').addEventListener('click', () => Office.context.ui.closeContainer?.());
-  $('btn-create').addEventListener('click', handleCreate);
-  $('btn-save-settings').addEventListener('click', handleSaveSettings);
-  $('btn-login').addEventListener('click', handleLogin);
-  $('btn-signout').addEventListener('click', handleSignOut);
+// ─── View switching ───────────────────────────────────────────────────────────
 
-  // Client change → filter contacts and assets
-  $('field-client').addEventListener('change', handleClientChange);
-
-  // Tag selection → add chip
-  $('field-tags').addEventListener('change', handleTagSelect);
-}
-
-// ─── View switching ───────────────────────────────────────────────
 function showView(name) {
-  $('view-create').classList.toggle('hidden', name !== 'create');
-  $('view-settings').classList.toggle('hidden', name !== 'settings');
+  currentView = name;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name)?.classList.add('active');
 }
 
-// ─── Auth ─────────────────────────────────────────────────────────
-function showAuthBanner() {
-  $('auth-banner').classList.remove('hidden');
-}
+// ─── Email data ───────────────────────────────────────────────────────────────
 
-async function handleLogin() {
-  try {
-    showStatus('Signing in to Gorelo…', 'loading');
-    await getToken();
-    $('auth-banner').classList.add('hidden');
-    hideStatus();
-    await loadDropdowns();
-    updateAccountInfo();
-  } catch (err) {
-    showStatus('Sign in failed: ' + err.message, 'error');
-  }
-}
-
-async function handleSignOut() {
-  await signOut();
-  showAuthBanner();
-  updateAccountInfo();
-}
-
-function updateAccountInfo() {
-  const account = getCurrentAccount();
-  $('account-info').textContent = account
-    ? `${account.name || account.username} (${account.username})`
-    : 'Not signed in';
-}
-
-// ─── Load email context ───────────────────────────────────────────
 async function loadEmailData() {
   const item = Office.context.mailbox.item;
   if (!item) return;
 
-  currentEmail = {
-    subject: item.subject || '',
-    from: item.from || { displayName: '', emailAddress: '' },
-  };
+  // From field
+  const from = item.from || {};
+  const fromDisplay = from.displayName
+    ? `${from.displayName} <${from.emailAddress}>`
+    : (from.emailAddress || '');
+  setVal('field-from', fromDisplay);
 
-  $('field-title').value = currentEmail.subject;
-  $('from-name').textContent = currentEmail.from.displayName || currentEmail.from.emailAddress;
-  $('from-email').textContent = currentEmail.from.displayName ? currentEmail.from.emailAddress : '';
+  // Subject
+  setVal('field-subject', item.subject || '');
 
-  // Try to auto-match contact by email address
-  // (will run after contacts are loaded)
+  // Body
+  item.body.getAsync(Office.CoercionType.Text, {}, result => {
+    if (result.status === Office.AsyncResultStatus.Succeeded) {
+      // Prepend sender info so context is preserved
+      const senderLine = fromDisplay ? `From: ${fromDisplay}\n\n` : '';
+      setVal('field-notes', senderLine + (result.value || '').trim());
+    }
+  });
 }
 
-// ─── Load dropdowns ───────────────────────────────────────────────
-async function loadDropdowns() {
-  showStatus('Loading Gorelo data…', 'loading');
+// ─── Form dropdowns ───────────────────────────────────────────────────────────
+
+async function loadFormDropdowns() {
+  const [groups, tags, mailboxes] = await Promise.allSettled([
+    getTechnicianGroups(),
+    getTags(),
+    getEmailConfigurations(),
+  ]);
+
+  // Groups
+  if (groups.status === 'fulfilled') {
+    populateSelect('field-group', groups.value, 'technicianGroupId', 'name', '', '— Select group —');
+    const defaultGroup = getSetting('defaultTechnicianGroupId');
+    if (defaultGroup) setVal('field-group', String(defaultGroup));
+  }
+
+  // Tags cache
+  if (tags.status === 'fulfilled') {
+    allTags = tags.value || [];
+  }
+
+  // Mailboxes
+  if (mailboxes.status === 'fulfilled') {
+    populateSelect('field-mailbox', mailboxes.value, 'emailConfigurationId', 'emailAddress', '', '— None —');
+    const defaultMailbox = getSetting('defaultEmailConfigurationId');
+    if (defaultMailbox) setVal('field-mailbox', String(defaultMailbox));
+  }
+
+  // Priorities / Sources (static)
+  populateSelect('field-priority', PRIORITIES, 'id', 'name');
+  setVal('field-priority', String(getSetting('defaultPriorityId') || 2));
+
+  populateSelect('field-source', SOURCES, 'id', 'name');
+  setVal('field-source', String(getSetting('defaultSourceId') || 2));
+
+  // Load clients
+  await loadClients();
+}
+
+async function loadClients() {
+  try {
+    const clients = await getClients();
+    populateSelect('field-client', clients, 'clientId', 'clientName', '', '— Select client —');
+
+    // Auto-match by sender email
+    const fromEmail = Office.context.mailbox.item?.from?.emailAddress || '';
+    if (fromEmail) {
+      await tryAutoMatchClient(fromEmail, clients);
+    }
+  } catch (err) {
+    console.warn('[Gorelo] Could not load clients', err.message);
+  }
+}
+
+async function tryAutoMatchClient(email, clients) {
+  // Try to find a contact with matching email, which tells us the client
+  try {
+    const contacts = await getContacts();
+    const match = contacts.find(c =>
+      (c.emailAddress || '').toLowerCase() === email.toLowerCase()
+    );
+    if (match?.clientId) {
+      setVal('field-client', String(match.clientId));
+      await onClientChange(match.clientId, match.contactId);
+    }
+  } catch { /* non-fatal */ }
+}
+
+async function onClientChange(clientId, preselectContactId) {
+  const contactSel = document.getElementById('field-contact');
+  contactSel.innerHTML = '<option value="">— Loading… —</option>';
 
   try {
-    const [clients, groups, technicians, tags, emailConfigs] = await Promise.allSettled([
-      getClients(),
+    const contacts = await getContacts(clientId || null);
+    populateSelect('field-contact', contacts, 'contactId', 'fullNameWithClientName', '', '— Select contact —');
+    if (preselectContactId) setVal('field-contact', String(preselectContactId));
+  } catch {
+    contactSel.innerHTML = '<option value="">— Select contact —</option>';
+  }
+}
+
+async function onGroupChange(groupId) {
+  const assigneeSel = document.getElementById('field-assignee');
+  assigneeSel.innerHTML = '<option value="">— Loading… —</option>';
+
+  try {
+    const techs = await getTechnicians(groupId || null);
+    populateSelect('field-assignee', techs, 'technicianId', firstName => {
+      // Callable name builder
+    }, '', '— Unassigned —');
+
+    // Rebuild properly with name formatting
+    assigneeSel.innerHTML = '<option value="">— Unassigned —</option>';
+    techs.forEach(t => {
+      const name = [t.firstName, t.lastName].filter(Boolean).join(' ') || t.email || `Tech #${t.technicianId}`;
+      const opt = new Option(name, t.technicianId);
+      assigneeSel.add(opt);
+    });
+
+    const defaultAssignee = getSetting('defaultAssignedToId');
+    if (defaultAssignee) setVal('field-assignee', String(defaultAssignee));
+  } catch {
+    assigneeSel.innerHTML = '<option value="">— Unassigned —</option>';
+  }
+}
+
+// ─── Tag input ────────────────────────────────────────────────────────────────
+
+function initTagInput() {
+  const input = document.getElementById('tag-text');
+  const suggestions = document.getElementById('tag-suggestions');
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { suggestions.classList.remove('visible'); return; }
+
+    const matches = allTags.filter(t =>
+      (t.name || t.tagName || '').toLowerCase().includes(q) &&
+      !selectedTags.find(s => s.id === (t.tagId || t.id))
+    ).slice(0, 8);
+
+    suggestions.innerHTML = '';
+    matches.forEach(t => {
+      const name = t.name || t.tagName;
+      const id = t.tagId || t.id;
+      const div = document.createElement('div');
+      div.className = 'tag-suggestion-item';
+      div.textContent = name;
+      div.addEventListener('mousedown', e => {
+        e.preventDefault();
+        addTag({ id, name });
+        input.value = '';
+        suggestions.classList.remove('visible');
+      });
+      suggestions.appendChild(div);
+    });
+
+    if (matches.length > 0) {
+      suggestions.classList.add('visible');
+    } else {
+      suggestions.classList.remove('visible');
+    }
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const val = input.value.trim().replace(/,$/, '');
+      if (val) {
+        // New tag (no ID)
+        addTag({ id: null, name: val });
+        input.value = '';
+        suggestions.classList.remove('visible');
+      }
+    }
+    if (e.key === 'Backspace' && !input.value && selectedTags.length) {
+      selectedTags.pop();
+      renderTags();
+    }
+  });
+
+  input.addEventListener('blur', () => {
+    setTimeout(() => suggestions.classList.remove('visible'), 150);
+  });
+}
+
+function addTag(tag) {
+  if (!selectedTags.find(t => t.name.toLowerCase() === tag.name.toLowerCase())) {
+    selectedTags.push(tag);
+    renderTags();
+  }
+}
+
+function renderTags() {
+  const wrap = document.getElementById('tag-wrap');
+  const input = document.getElementById('tag-text');
+  // Remove existing chips
+  wrap.querySelectorAll('.tag-chip').forEach(c => c.remove());
+  // Re-insert chips before the input
+  selectedTags.forEach((tag, i) => {
+    const chip = document.createElement('span');
+    chip.className = 'tag-chip';
+    chip.innerHTML = `${tag.name} <span class="remove" data-idx="${i}">×</span>`;
+    chip.querySelector('.remove').addEventListener('click', () => {
+      selectedTags.splice(i, 1);
+      renderTags();
+    });
+    wrap.insertBefore(chip, input);
+  });
+}
+
+// ─── Submit ───────────────────────────────────────────────────────────────────
+
+async function submitTicket() {
+  const subject = getVal('field-subject').trim();
+  const groupId = getVal('field-group');
+
+  if (!subject) return showFormAlert('Please enter a ticket title.', 'error');
+  if (!groupId) return showFormAlert('Please select a group (required by Gorelo).', 'error');
+
+  setSubmitting(true);
+  hideFormAlert();
+
+  try {
+    const result = await createTicket({
+      title: subject,
+      description: getVal('field-notes'),
+      markdownComment: getVal('field-notes'),
+      clientId: intVal('field-client'),
+      clientName: getVal('field-client') ? document.getElementById('field-client').selectedOptions[0]?.text : '',
+      contactId: intVal('field-contact'),
+      outboundContactEmail: Office.context.mailbox.item?.from?.emailAddress || '',
+      technicianGroupIds: groupId ? [Number(groupId)] : [],
+      assignedToId: intVal('field-assignee'),
+      priorityId: intVal('field-priority') || 2,
+      sourceId: intVal('field-source') || 2,
+      emailConfigurationId: intVal('field-mailbox') || null,
+      newTags: selectedTags.filter(t => t.id === null).map(t => t.name),
+      existingTagIds: selectedTags.filter(t => t.id !== null).map(t => String(t.id)),
+      sendNotification: document.getElementById('toggle-notify').checked,
+    });
+
+    const ticketNum = result?.ticketNumberWithPrefix || result?.ticketNumber || '';
+    showFormAlert(
+      ticketNum ? `✓ Ticket ${ticketNum} created successfully.` : '✓ Ticket created successfully.',
+      'success'
+    );
+
+    // Reset form for next use
+    setTimeout(() => {
+      selectedTags = [];
+      renderTags();
+      hideFormAlert();
+    }, 4000);
+
+  } catch (err) {
+    showFormAlert('Error: ' + (err.message || 'Could not create ticket.'), 'error');
+  } finally {
+    setSubmitting(false);
+  }
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+
+async function loadSettingsView() {
+  const settings = getAllSettings();
+
+  // API key
+  document.getElementById('settings-api-key').value = settings.apiKey || '';
+
+  // Load dropdowns for defaults
+  try {
+    const [groups, techs, mailboxes] = await Promise.allSettled([
       getTechnicianGroups(),
       getTechnicians(),
-      getTags(),
       getEmailConfigurations(),
     ]);
 
-    // Clients
-    if (clients.status === 'fulfilled') {
-      allClients = normaliseList(clients.value, 'clientId', 'clientName');
-      populateSelect('field-client', allClients, 'Select client…');
-      populateSelect('s-group', [], 'Loading…'); // reset until client chosen
-    }
-
-    // Groups
     if (groups.status === 'fulfilled') {
-      allGroups = normaliseList(groups.value, 'technicianGroupId', 'technicianGroupName');
-      populateSelect('field-group', allGroups, 'Select group…');
-      populateSelect('s-group', allGroups, 'Select group…');
-      // Apply saved default
-      const savedGroup = getSetting('defaultTechnicianGroupId');
-      if (savedGroup) {
-        $('field-group').value = savedGroup;
-        $('s-group').value = savedGroup;
-      }
+      populateSelect('settings-default-group', groups.value, 'technicianGroupId', 'name', settings.defaultTechnicianGroupId || '', '— None —');
     }
-
-    // Technicians
-    if (technicians.status === 'fulfilled') {
-      allTechnicians = normaliseList(technicians.value, 'technicianId', r =>
-        `${r.firstName} ${r.lastName}`.trim()
-      );
-      populateSelect('field-assignee', allTechnicians, 'Unassigned', true);
-      populateSelect('s-assignee', allTechnicians, 'Unassigned', true);
-      const savedAssignee = getSetting('defaultAssignedToId');
-      if (savedAssignee) {
-        $('field-assignee').value = savedAssignee;
-        $('s-assignee').value = savedAssignee;
-      }
+    if (techs.status === 'fulfilled') {
+      const sel = document.getElementById('settings-default-assignee');
+      sel.innerHTML = '<option value="">— None —</option>';
+      techs.value.forEach(t => {
+        const name = [t.firstName, t.lastName].filter(Boolean).join(' ') || t.email;
+        const opt = new Option(name, t.technicianId);
+        if (String(t.technicianId) === String(settings.defaultAssignedToId)) opt.selected = true;
+        sel.add(opt);
+      });
     }
-
-    // Tags
-    if (tags.status === 'fulfilled') {
-      allTags = normaliseList(tags.value, 'tagId', 'tagName');
-      populateSelect('field-tags', allTags, 'Add tag…');
+    if (mailboxes.status === 'fulfilled') {
+      populateSelect('settings-default-mailbox', mailboxes.value, 'emailConfigurationId', 'emailAddress', settings.defaultEmailConfigurationId || '', '— None —');
     }
+  } catch { /* non-fatal */ }
 
-    // Email configs
-    if (emailConfigs.status === 'fulfilled') {
-      allEmailConfigs = normaliseList(emailConfigs.value, 'emailConfigurationId',
-        r => r.serviceProviderFromEmailAddress
-      );
-      populateSelect('field-emailconfig', allEmailConfigs, 'Select mailbox…');
-      populateSelect('s-emailconfig', allEmailConfigs, 'Select mailbox…');
-      const savedConfig = getSetting('defaultEmailConfigurationId');
-      if (savedConfig) {
-        $('field-emailconfig').value = savedConfig;
-        $('s-emailconfig').value = savedConfig;
-      }
-    }
+  populateSelect('settings-default-priority', PRIORITIES, 'id', 'name', settings.defaultPriorityId || 2);
+  populateSelect('settings-default-source', SOURCES, 'id', 'name', settings.defaultSourceId || 2);
 
-    // Apply other saved settings
-    const savedPriority = getSetting('defaultPriorityId');
-    if (savedPriority) $('field-priority').value = savedPriority;
-    $('s-priority').value = getSetting('defaultPriorityId') || 2;
-    $('s-autopane').checked = getSetting('autoOpenTaskPane') || false;
-
-    hideStatus();
-
-    // Auto-match sender to contact/client
-    if (currentEmail?.from?.emailAddress) {
-      await tryAutoMatch(currentEmail.from.emailAddress);
-    }
-
-  } catch (err) {
-    showStatus('Failed to load data: ' + err.message, 'error');
-  }
+  document.getElementById('settings-auto-open').checked = !!settings.autoOpenTaskPane;
 }
 
-// ─── Client change handler ────────────────────────────────────────
-async function handleClientChange() {
-  const clientId = parseInt($('field-client').value);
-  if (!clientId) {
-    populateSelect('field-contact', [], 'Select client first');
-    populateSelect('field-asset', [], 'None');
-    return;
-  }
+async function saveSettingsFromUI() {
+  hideSettingsAlert();
 
   try {
-    const [contacts, assets] = await Promise.all([
-      getContacts(clientId),
-      getAssets(clientId),
-    ]);
-
-    allContacts = normaliseList(contacts, 'contactId',
-      r => `${r.firstName} ${r.lastName}`.trim() || r.emailAddress
-    );
-    populateSelect('field-contact', allContacts, 'Select contact…', true);
-
-    allAssets = normaliseList(assets, 'assetId', 'assetName');
-    populateSelect('field-asset', allAssets, 'None', true);
-
-    // Auto-match contact by email if we have sender info
-    if (currentEmail?.from?.emailAddress) {
-      tryMatchContact(currentEmail.from.emailAddress);
-    }
-  } catch (err) {
-    console.warn('Failed to load contacts/assets:', err);
-  }
-}
-
-// ─── Tag handling ─────────────────────────────────────────────────
-function handleTagSelect() {
-  const select = $('field-tags');
-  const id = parseInt(select.value);
-  if (!id || selectedTagIds.includes(id)) {
-    select.value = '';
-    return;
-  }
-  const tag = allTags.find(t => t.id === id);
-  if (!tag) return;
-
-  selectedTagIds.push(id);
-  addTagChip(id, tag.name);
-  select.value = '';
-}
-
-function addTagChip(id, name) {
-  const chip = document.createElement('div');
-  chip.className = 'tag-chip';
-  chip.dataset.tagId = id;
-  chip.innerHTML = `<span>${name}</span><button type="button" aria-label="Remove tag">×</button>`;
-  chip.querySelector('button').addEventListener('click', () => {
-    selectedTagIds = selectedTagIds.filter(t => t !== id);
-    chip.remove();
-  });
-  $('tag-chips').appendChild(chip);
-}
-
-// ─── Auto-match sender ────────────────────────────────────────────
-async function tryAutoMatch(emailAddress) {
-  // Try to find a contact with this email across all clients
-  // We'll load all contacts and search
-  try {
-    const contacts = await getContacts();
-    const match = (Array.isArray(contacts) ? contacts : contacts?.data || [])
-      .find(c => c.emailAddress?.toLowerCase() === emailAddress.toLowerCase() ||
-        (c.secondaryAddress || []).includes(emailAddress.toLowerCase()));
-
-    if (match && match.clientId) {
-      $('field-client').value = match.clientId;
-      await handleClientChange();
-      $('field-contact').value = match.contactId;
-    }
-  } catch {
-    // Silent fail — auto-match is best effort
-  }
-}
-
-function tryMatchContact(emailAddress) {
-  const match = allContacts.find(c => {
-    const orig = allContacts._raw?.find(r => r.id === c.id);
-    return orig?.emailAddress?.toLowerCase() === emailAddress.toLowerCase();
-  });
-  if (match) $('field-contact').value = match.id;
-}
-
-// ─── Create ticket ────────────────────────────────────────────────
-async function handleCreate() {
-  const title = $('field-title').value.trim();
-  const clientId = parseInt($('field-client').value) || 0;
-  const groupId = parseInt($('field-group').value) || 0;
-
-  if (!title) {
-    showStatus('Please enter a ticket title.', 'error');
-    return;
-  }
-  if (!groupId) {
-    showStatus('Please select a group.', 'error');
-    return;
-  }
-
-  $('btn-create').disabled = true;
-  showStatus('<span class="spinner"></span>Creating ticket…', 'loading');
-
-  try {
-    const item = Office.context.mailbox.item;
-    const body = await getBodyAsync(item);
-
-    const clientName = allClients.find(c => c.id === clientId)?.name || '';
-    const contactId = parseInt($('field-contact').value) || 0;
-    const notes = $('field-notes').value.trim();
-
-    const description = buildDescription(
-      currentEmail?.from,
-      title,
-      body,
-      notes
-    );
-
-    const markdownComment = [
-      currentEmail?.from
-        ? `**From:** ${currentEmail.from.displayName} <${currentEmail.from.emailAddress}>`
-        : '',
-      notes ? `**Notes:** ${notes}` : '',
-    ].filter(Boolean).join('\n\n');
-
-    await createTicket({
-      title,
-      description,
-      markdownComment,
-      clientId,
-      clientName,
-      contactId,
-      outboundContactEmail: currentEmail?.from?.emailAddress || '',
-      technicianGroupIds: groupId ? [groupId] : [],
-      assignedToId: parseInt($('field-assignee').value) || 0,
-      priorityId: parseInt($('field-priority').value) || 2,
-      sourceId: parseInt($('field-source').value) || 2,
-      emailConfigurationId: parseInt($('field-emailconfig').value) || 0,
-      tagIds: selectedTagIds,
-      deviceIds: $('field-asset').value ? [$('field-asset').value] : [],
-      sendTicketCreatedEmail: $('field-notify').checked,
+    await saveSettings({
+      defaultTechnicianGroupId: getVal('settings-default-group'),
+      defaultAssignedToId: getVal('settings-default-assignee'),
+      defaultPriorityId: intVal('settings-default-priority') || 2,
+      defaultSourceId: intVal('settings-default-source') || 2,
+      defaultEmailConfigurationId: getVal('settings-default-mailbox'),
+      autoOpenTaskPane: document.getElementById('settings-auto-open').checked,
     });
-
-    showStatus('✓ Ticket created successfully!', 'success');
-    $('btn-create').disabled = false;
-
-    // Auto-close after 2 seconds
-    setTimeout(() => {
-      Office.context.ui.closeContainer?.();
-    }, 2000);
-
+    showSettingsAlert('✓ Defaults saved.', 'success');
+    setTimeout(hideSettingsAlert, 2500);
   } catch (err) {
-    showStatus('Failed to create ticket: ' + err.message, 'error');
-    $('btn-create').disabled = false;
+    showSettingsAlert('Error saving: ' + err.message, 'error');
   }
 }
 
-// ─── Settings ─────────────────────────────────────────────────────
-async function handleSaveSettings() {
-  setSetting('defaultEmailConfigurationId', parseInt($('s-emailconfig').value) || 0);
-  setSetting('defaultTechnicianGroupId', parseInt($('s-group').value) || 0);
-  setSetting('defaultAssignedToId', parseInt($('s-assignee').value) || 0);
-  setSetting('defaultPriorityId', parseInt($('s-priority').value) || 2);
-  setSetting('autoOpenTaskPane', $('s-autopane').checked);
+async function validateAndSaveApiKey() {
+  const key = document.getElementById('settings-api-key').value.trim();
+  const statusEl = document.getElementById('api-key-status');
 
-  try {
-    await saveSettings();
-    showStatus('Settings saved.', 'success');
-    setTimeout(hideStatus, 2000);
-  } catch (err) {
-    showStatus('Failed to save settings: ' + err.message, 'error');
+  statusEl.textContent = 'Validating…';
+  statusEl.className = 'api-key-status';
+  statusEl.classList.remove('hidden');
+
+  const result = await validateApiKey(key);
+
+  if (result.valid) {
+    statusEl.textContent = '✓ API key is valid';
+    statusEl.classList.add('ok');
+
+    await saveSettings({ apiKey: key });
+    showSettingsAlert('✓ API key saved successfully.', 'success');
+
+    // If we were on the setup screen, load the form now
+    if (currentView === 'settings') {
+      // re-enable form for next navigation
+      setTimeout(() => showSettingsAlert('', 'hidden'), 3000);
+    }
+  } else {
+    statusEl.textContent = '✗ ' + result.error;
+    statusEl.classList.add('err');
   }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────
+// ─── Event wiring ─────────────────────────────────────────────────────────────
 
-/**
- * Normalise an API response into [{id, name}] for populating selects.
- * nameField can be a string key or a function.
- */
-function normaliseList(data, idField, nameField) {
-  const arr = Array.isArray(data) ? data : (data?.data || data?.items || []);
-  return arr.map(r => ({
-    id: r[idField],
-    name: typeof nameField === 'function' ? nameField(r) : r[nameField],
-    _raw: r,
-  })).filter(r => r.id);
-}
-
-/**
- * Populate a <select> element.
- */
-function populateSelect(id, items, placeholder, includeEmpty = false) {
-  const select = $(id);
-  const current = select.value;
-  select.innerHTML = '';
-
-  if (placeholder || includeEmpty) {
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = placeholder || '—';
-    select.appendChild(opt);
-  }
-
-  items.forEach(item => {
-    const opt = document.createElement('option');
-    opt.value = item.id;
-    opt.textContent = item.name || `ID: ${item.id}`;
-    select.appendChild(opt);
+document.addEventListener('DOMContentLoaded', () => {
+  // Header buttons
+  document.getElementById('btn-settings').addEventListener('click', async () => {
+    showView('settings');
+    await loadSettingsView();
+  });
+  document.getElementById('btn-refresh').addEventListener('click', async () => {
+    if (currentView === 'form') {
+      await loadEmailData();
+    }
   });
 
-  // Restore selection if still valid
-  if (current && [...select.options].some(o => o.value === current)) {
-    select.value = current;
-  }
-}
+  // Setup view
+  document.getElementById('btn-goto-settings').addEventListener('click', async () => {
+    showView('settings');
+    await loadSettingsView();
+  });
 
-/**
- * Build HTML ticket description preserving original email context.
- */
-function buildDescription(from, subject, body, notes) {
-  const fromStr = from
-    ? `${escapeHtml(from.displayName)} &lt;${escapeHtml(from.emailAddress)}&gt;`
-    : '';
+  // Form
+  document.getElementById('field-client').addEventListener('change', e => {
+    onClientChange(e.target.value);
+  });
+  document.getElementById('field-group').addEventListener('change', e => {
+    onGroupChange(e.target.value);
+  });
+  document.getElementById('btn-submit').addEventListener('click', submitTicket);
 
-  return `
-    <div style="border-left:3px solid #1DAF94;padding:8px 12px;margin-bottom:12px;background:#f0fdf9;">
-      <p style="margin:0 0 4px;font-size:12px;color:#6b7280;">Original email</p>
-      ${fromStr ? `<p style="margin:0;"><strong>From:</strong> ${fromStr}</p>` : ''}
-      ${notes ? `<p style="margin:4px 0 0;"><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ''}
-    </div>
-    ${body}
-  `.trim();
-}
+  // Settings
+  document.getElementById('btn-validate-key').addEventListener('click', validateAndSaveApiKey);
+  document.getElementById('btn-save-settings').addEventListener('click', saveSettingsFromUI);
+  document.getElementById('btn-back').addEventListener('click', async () => {
+    if (isAuthenticated()) {
+      showView('form');
+    } else {
+      showView('setup');
+    }
+  });
+  document.getElementById('btn-show-key').addEventListener('click', () => {
+    const input = document.getElementById('settings-api-key');
+    const btn = document.getElementById('btn-show-key');
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.textContent = 'Hide';
+    } else {
+      input.type = 'password';
+      btn.textContent = 'Show';
+    }
+  });
 
-function escapeHtml(str) {
-  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+  initTagInput();
+});
 
-function getBodyAsync(item) {
-  return new Promise(resolve => {
-    item.body.getAsync(Office.CoercionType.Html, {}, result => {
-      if (result.status === Office.AsyncResultStatus.Succeeded) {
-        resolve(result.value || '');
-      } else {
-        item.body.getAsync(Office.CoercionType.Text, {}, r => resolve(r.value || ''));
-      }
-    });
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+function populateSelect(id, items, valueKey, labelKey, selectedValue, emptyLabel) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  const current = selectedValue !== undefined ? String(selectedValue) : sel.value;
+  sel.innerHTML = emptyLabel ? `<option value="">${emptyLabel}</option>` : '';
+  (items || []).forEach(item => {
+    const val = String(item[valueKey] ?? '');
+    const label = typeof labelKey === 'function' ? labelKey(item) : (item[labelKey] ?? val);
+    const opt = new Option(label, val);
+    if (val && val === current) opt.selected = true;
+    sel.add(opt);
   });
 }
 
-function showStatus(html, type) {
-  const el = $('status-message');
-  el.innerHTML = html;
-  el.className = `status-message ${type}`;
+function getVal(id) {
+  return document.getElementById(id)?.value || '';
+}
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val;
+}
+function intVal(id) {
+  const v = getVal(id);
+  const n = parseInt(v, 10);
+  return isNaN(n) ? 0 : n;
+}
+
+function setSubmitting(on) {
+  const btn = document.getElementById('btn-submit');
+  const text = document.getElementById('btn-submit-text');
+  const spinner = document.getElementById('btn-submit-spinner');
+  btn.disabled = on;
+  text.textContent = on ? 'Creating…' : 'Create Ticket';
+  spinner.classList.toggle('hidden', !on);
+}
+
+function showFormAlert(msg, type) {
+  const el = document.getElementById('form-alert');
+  el.textContent = msg;
+  el.className = `alert alert-${type}`;
   el.classList.remove('hidden');
 }
-
-function hideStatus() {
-  $('status-message').classList.add('hidden');
+function hideFormAlert() {
+  document.getElementById('form-alert').classList.add('hidden');
+}
+function showSettingsAlert(msg, type) {
+  const el = document.getElementById('settings-alert');
+  if (!msg) { el.classList.add('hidden'); return; }
+  el.textContent = msg;
+  el.className = `alert alert-${type}`;
+  el.classList.remove('hidden');
+}
+function hideSettingsAlert() {
+  document.getElementById('settings-alert').classList.add('hidden');
 }

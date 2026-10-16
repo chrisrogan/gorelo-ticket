@@ -4,219 +4,535 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gorelo Ticket</title>
-  <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <link rel="stylesheet" href="taskpane.css" />
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <style>
+    :root {
+      --gorelo: #1DAF94;
+      --gorelo-dark: #178a76;
+      --gorelo-light: #e8f8f5;
+      --danger: #dc3545;
+      --muted: #6c757d;
+      --border: #dee2e6;
+      --bg: #ffffff;
+      --surface: #f8f9fa;
+      --text: #212529;
+      --radius: 6px;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      font-size: 13px;
+      color: var(--text);
+      background: var(--bg);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--gorelo);
+      color: #fff;
+    }
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .header-brand svg { flex-shrink: 0; }
+    .btn-icon {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.85);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+    }
+    .btn-icon:hover { color: #fff; background: rgba(255,255,255,0.15); }
+
+    /* ── Views ── */
+    .view { display: none; padding: 14px; }
+    .view.active { display: block; }
+
+    /* ── API key banner ── */
+    #view-setup {
+      display: none;
+      text-align: center;
+      padding: 30px 20px;
+    }
+    #view-setup.active { display: block; }
+    .setup-icon { font-size: 40px; margin-bottom: 12px; }
+    .setup-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+    .setup-text { color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+    .setup-link {
+      display: inline-block;
+      font-size: 11px;
+      color: var(--gorelo);
+      text-decoration: none;
+      margin-top: 10px;
+    }
+    .setup-link:hover { text-decoration: underline; }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 10px; }
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    label .req { color: var(--danger); margin-left: 2px; }
+
+    input[type="text"],
+    input[type="password"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 7px 9px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-family: var(--font);
+      color: var(--text);
+      background: var(--bg);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--gorelo);
+      box-shadow: 0 0 0 2px rgba(29,175,148,0.15);
+    }
+    input[readonly] { background: var(--surface); color: var(--muted); }
+    textarea { resize: vertical; min-height: 70px; }
+    select { cursor: pointer; }
+
+    /* ── Tag chips ── */
+    .tag-input-wrap {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 5px 7px;
+      min-height: 36px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      cursor: text;
+    }
+    .tag-input-wrap:focus-within {
+      border-color: var(--gorelo);
+      box-shadow: 0 0 0 2px rgba(29,175,148,0.15);
+    }
+    .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--gorelo-light);
+      color: var(--gorelo-dark);
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .tag-chip .remove {
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      color: var(--gorelo);
+    }
+    .tag-chip .remove:hover { color: var(--danger); }
+    #tag-text {
+      border: none;
+      outline: none;
+      font-size: 12px;
+      padding: 1px 2px;
+      min-width: 80px;
+      flex: 1;
+      font-family: var(--font);
+    }
+    .tag-suggestions {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      max-height: 120px;
+      overflow-y: auto;
+      display: none;
+      margin-top: 2px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .tag-suggestions.visible { display: block; }
+    .tag-suggestion-item {
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .tag-suggestion-item:hover { background: var(--gorelo-light); }
+
+    /* ── Toggle ── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+    }
+    .toggle-label { font-size: 12px; color: var(--text); }
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #ccc;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .toggle-slider { background: var(--gorelo); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 600;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-primary {
+      background: var(--gorelo);
+      color: #fff;
+      width: 100%;
+    }
+    .btn-primary:hover { background: var(--gorelo-dark); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-danger {
+      background: #fff3f3;
+      color: var(--danger);
+      border: 1px solid #f5c6cb;
+    }
+    .btn-danger:hover { background: #fce8e9; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+    /* ── Status messages ── */
+    .alert {
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .alert-success { background: var(--gorelo-light); color: var(--gorelo-dark); }
+    .alert-error { background: #fce8e9; color: var(--danger); }
+    .alert-info { background: #e8f4fd; color: #0c63a4; }
+    .hidden { display: none !important; }
+
+    /* ── Loading spinner ── */
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Settings view ── */
+    .settings-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      margin: 16px 0 8px;
+    }
+    .settings-section-title:first-child { margin-top: 0; }
+    .api-key-wrap { position: relative; }
+    .api-key-wrap input { padding-right: 70px; }
+    .btn-show-key {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      font-size: 11px;
+      color: var(--gorelo);
+      cursor: pointer;
+      padding: 2px 4px;
+      font-family: var(--font);
+    }
+    .api-key-status {
+      font-size: 11px;
+      margin-top: 4px;
+    }
+    .api-key-status.ok { color: var(--gorelo-dark); }
+    .api-key-status.err { color: var(--danger); }
+
+    /* ── Divider ── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+    /* ── Footer actions ── */
+    .form-footer {
+      padding-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .form-footer-row {
+      display: flex;
+      gap: 8px;
+    }
+    .form-footer-row .btn { flex: 1; }
+  </style>
 </head>
 <body>
-  <!-- ── Header ─────────────────────────────────────────────────── -->
-  <header class="header">
-    <div class="header-inner">
-      <img src="../../assets/gorelo-logo.svg" alt="Gorelo" class="logo" />
-      <span class="header-title">Gorelo Ticket</span>
-      <button class="btn-icon" id="btn-settings" title="Settings" aria-label="Settings">⚙</button>
-    </div>
-  </header>
 
-  <!-- ── Auth banner (shown when not logged in) ─────────────────── -->
-  <div id="auth-banner" class="banner banner--warn hidden">
-    <span>Not connected to Gorelo.</span>
-    <button class="btn-link" id="btn-login">Sign in</button>
+  <!-- ── Header ───────────────────────────────────────────────── -->
+  <div class="header">
+    <div class="header-brand">
+      <svg width="20" height="20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="16" r="16" fill="rgba(255,255,255,0.2)"/>
+        <path d="M16 8C11.582 8 8 11.582 8 16s3.582 8 8 8c2.072 0 3.967-.787 5.394-2.077l-2.3-2.3A4.95 4.95 0 0116 20.98c-2.749 0-4.98-2.231-4.98-4.98S13.251 11.02 16 11.02c1.38 0 2.63.56 3.534 1.466L21.98 10a7.945 7.945 0 00-5.98-2z" fill="white"/>
+        <path d="M22.607 13.32l-5.5 5.5-2.5-2.5-1.414 1.414 3.914 3.914 6.914-6.914-1.414-1.414z" fill="white"/>
+      </svg>
+      Gorelo Ticket
+    </div>
+    <div style="display:flex;gap:4px;">
+      <button class="btn-icon" id="btn-refresh" title="Refresh email data">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+        </svg>
+      </button>
+      <button class="btn-icon" id="btn-settings" title="Settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
   </div>
 
-  <!-- ── Status message ─────────────────────────────────────────── -->
-  <div id="status-message" class="status-message hidden"></div>
+  <!-- ── Setup / No API key ────────────────────────────────────── -->
+  <div id="view-setup" class="view">
+    <div class="setup-icon">🔑</div>
+    <div class="setup-title">Connect to Gorelo</div>
+    <div class="setup-text">
+      Add your Gorelo API key to start creating tickets from emails.<br>
+      Generate one in Gorelo under <strong>Settings → Integrated Apps → API Keys</strong>.
+    </div>
+    <button class="btn btn-primary" id="btn-goto-settings">Open Settings</button>
+    <br>
+    <a class="setup-link" href="https://help.gorelo.io" target="_blank">Gorelo Help ↗</a>
+  </div>
 
-  <!-- ── Main form: Create Ticket ──────────────────────────────── -->
-  <main id="view-create" class="view">
+  <!-- ── Create Ticket form ────────────────────────────────────── -->
+  <div id="view-form" class="view">
+    <div id="form-alert" class="alert hidden"></div>
 
-    <div class="form-section">
-      <!-- Original sender info (read-only, from email) -->
-      <div class="field-group">
-        <label class="label">From</label>
-        <div class="from-display" id="from-display">
-          <span id="from-name" class="from-name">—</span>
-          <span id="from-email" class="from-email"></span>
-        </div>
+    <!-- From (read-only) -->
+    <div class="form-group">
+      <label>From</label>
+      <input type="text" id="field-from" readonly placeholder="Loading…" />
+    </div>
+
+    <!-- Subject / Title -->
+    <div class="form-group">
+      <label>Subject / Title<span class="req">*</span></label>
+      <input type="text" id="field-subject" placeholder="Ticket title" />
+    </div>
+
+    <!-- Client -->
+    <div class="form-group">
+      <label>Client</label>
+      <select id="field-client">
+        <option value="">— Select client —</option>
+      </select>
+    </div>
+
+    <!-- Contact -->
+    <div class="form-group">
+      <label>Contact</label>
+      <select id="field-contact">
+        <option value="">— Select contact —</option>
+      </select>
+    </div>
+
+    <!-- Group (required) -->
+    <div class="form-group">
+      <label>Group<span class="req">*</span></label>
+      <select id="field-group">
+        <option value="">— Select group —</option>
+      </select>
+    </div>
+
+    <!-- Assignee -->
+    <div class="form-group">
+      <label>Assignee</label>
+      <select id="field-assignee">
+        <option value="">— Unassigned —</option>
+      </select>
+    </div>
+
+    <!-- Priority + Source (side by side) -->
+    <div style="display:flex;gap:8px;">
+      <div class="form-group" style="flex:1;">
+        <label>Priority</label>
+        <select id="field-priority"></select>
       </div>
-
-      <!-- Subject / Ticket title -->
-      <div class="field-group">
-        <label class="label" for="field-title">Subject <span class="required">*</span></label>
-        <input type="text" id="field-title" class="input" placeholder="Ticket title" />
+      <div class="form-group" style="flex:1;">
+        <label>Source</label>
+        <select id="field-source"></select>
       </div>
     </div>
 
-    <div class="form-section">
-      <!-- Client -->
-      <div class="field-group">
-        <label class="label" for="field-client">Client</label>
-        <select id="field-client" class="select">
-          <option value="">Loading…</option>
-        </select>
+    <!-- Tags -->
+    <div class="form-group">
+      <label>Tags</label>
+      <div class="tag-input-wrap" id="tag-wrap">
+        <input type="text" id="tag-text" placeholder="Type to search tags…" autocomplete="off" />
       </div>
-
-      <!-- Contact (filtered by client) -->
-      <div class="field-group">
-        <label class="label" for="field-contact">Contact</label>
-        <select id="field-contact" class="select">
-          <option value="">Select client first</option>
-        </select>
-      </div>
-
-      <!-- Group (required by Gorelo) -->
-      <div class="field-group">
-        <label class="label" for="field-group">Group <span class="required">*</span></label>
-        <select id="field-group" class="select">
-          <option value="">Loading…</option>
-        </select>
-      </div>
-
-      <!-- Assignee -->
-      <div class="field-group">
-        <label class="label" for="field-assignee">Assignee</label>
-        <select id="field-assignee" class="select">
-          <option value="0">Unassigned</option>
-        </select>
-      </div>
+      <div class="tag-suggestions" id="tag-suggestions"></div>
     </div>
 
-    <div class="form-section form-section--row">
-      <!-- Priority -->
-      <div class="field-group field-group--half">
-        <label class="label" for="field-priority">Priority</label>
-        <select id="field-priority" class="select">
-          <option value="4">Urgent</option>
-          <option value="1">High</option>
-          <option value="2" selected>Normal</option>
-          <option value="3">Low</option>
-        </select>
-      </div>
-
-      <!-- Source -->
-      <div class="field-group field-group--half">
-        <label class="label" for="field-source">Source</label>
-        <select id="field-source" class="select">
-          <option value="2" selected>Email</option>
-          <option value="1">Web</option>
-          <option value="3">Phone</option>
-          <option value="4">Chat</option>
-        </select>
-      </div>
+    <!-- Inbound Mailbox -->
+    <div class="form-group">
+      <label>Inbound Mailbox</label>
+      <select id="field-mailbox">
+        <option value="">— None —</option>
+      </select>
     </div>
 
-    <div class="form-section">
-      <!-- Tags -->
-      <div class="field-group">
-        <label class="label">Tags</label>
-        <div id="tag-container" class="tag-container">
-          <div id="tag-chips" class="tag-chips"></div>
-          <select id="field-tags" class="select select--tags">
-            <option value="">Add tag…</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Asset -->
-      <div class="field-group">
-        <label class="label" for="field-asset">Asset</label>
-        <select id="field-asset" class="select">
-          <option value="">None</option>
-        </select>
-      </div>
-
-      <!-- Additional notes -->
-      <div class="field-group">
-        <label class="label" for="field-notes">Additional Notes</label>
-        <textarea id="field-notes" class="textarea" rows="3"
-          placeholder="Optional notes to prepend to the ticket…"></textarea>
-      </div>
+    <!-- Notes -->
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="field-notes" rows="4" placeholder="Ticket description / body"></textarea>
     </div>
 
-    <div class="form-section">
-      <!-- Email configuration -->
-      <div class="field-group">
-        <label class="label" for="field-emailconfig">Inbound Mailbox</label>
-        <select id="field-emailconfig" class="select">
-          <option value="">Loading…</option>
-        </select>
-      </div>
-
-      <!-- Send notification toggle -->
-      <div class="field-group field-group--toggle">
-        <label class="label" for="field-notify">Send ticket created email</label>
-        <input type="checkbox" id="field-notify" class="toggle" checked />
-      </div>
+    <!-- Send notification toggle -->
+    <div class="toggle-row">
+      <span class="toggle-label">Send ticket notification email</span>
+      <label class="toggle">
+        <input type="checkbox" id="toggle-notify" checked />
+        <span class="toggle-slider"></span>
+      </label>
     </div>
 
-    <!-- Action buttons -->
-    <div class="actions">
-      <button id="btn-create" class="btn btn--primary">Create Ticket</button>
-      <button id="btn-cancel" class="btn btn--secondary">Cancel</button>
+    <div class="form-footer">
+      <button class="btn btn-primary" id="btn-submit">
+        <span id="btn-submit-text">Create Ticket</span>
+        <span id="btn-submit-spinner" class="spinner hidden"></span>
+      </button>
     </div>
-  </main>
+  </div>
 
-  <!-- ── Settings view ──────────────────────────────────────────── -->
-  <main id="view-settings" class="view hidden">
-    <div class="settings-header">
-      <button class="btn-back" id="btn-back">← Back</button>
-      <h2 class="settings-title">Settings</h2>
+  <!-- ── Settings ─────────────────────────────────────────────── -->
+  <div id="view-settings" class="view">
+    <div id="settings-alert" class="alert hidden"></div>
+
+    <div class="settings-section-title">API Key</div>
+    <div class="form-group">
+      <div class="api-key-wrap">
+        <input type="password" id="settings-api-key" placeholder="Paste your Gorelo API key" autocomplete="off" />
+        <button class="btn-show-key" id="btn-show-key">Show</button>
+      </div>
+      <div id="api-key-status" class="api-key-status hidden"></div>
+      <button class="btn btn-secondary btn-sm" id="btn-validate-key" style="margin-top:6px;">
+        Validate &amp; Save
+      </button>
     </div>
+    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-top:-4px;">
+      Generate in Gorelo: <strong>Settings → Integrated Apps → API Keys</strong>
+    </p>
 
-    <div class="form-section">
-      <p class="help-text">
-        These defaults are used for Quick Create (one-click). You can override
-        them per-ticket in the main form.
-      </p>
+    <div class="settings-section-title">Defaults</div>
 
-      <div class="field-group">
-        <label class="label" for="s-emailconfig">Default Inbound Mailbox</label>
-        <select id="s-emailconfig" class="select">
-          <option value="">Loading…</option>
-        </select>
-      </div>
-
-      <div class="field-group">
-        <label class="label" for="s-group">Default Group</label>
-        <select id="s-group" class="select">
-          <option value="">Loading…</option>
-        </select>
-      </div>
-
-      <div class="field-group">
-        <label class="label" for="s-assignee">Default Assignee</label>
-        <select id="s-assignee" class="select">
-          <option value="0">Unassigned</option>
-        </select>
-      </div>
-
-      <div class="field-group">
-        <label class="label" for="s-priority">Default Priority</label>
-        <select id="s-priority" class="select">
-          <option value="4">Urgent</option>
-          <option value="1">High</option>
-          <option value="2" selected>Normal</option>
-          <option value="3">Low</option>
-        </select>
-      </div>
-
-      <div class="field-group field-group--toggle">
-        <label class="label" for="s-autopane">Always open task pane (disable quick create)</label>
-        <input type="checkbox" id="s-autopane" class="toggle" />
-      </div>
+    <div class="form-group">
+      <label>Default Group</label>
+      <select id="settings-default-group">
+        <option value="">— None —</option>
+      </select>
     </div>
 
-    <div class="form-section">
-      <div class="field-group">
-        <label class="label">Gorelo Account</label>
-        <div id="account-info" class="account-info">Not signed in</div>
-        <button class="btn btn--secondary btn--sm" id="btn-signout">Sign out</button>
-      </div>
+    <div class="form-group">
+      <label>Default Assignee</label>
+      <select id="settings-default-assignee">
+        <option value="">— None —</option>
+      </select>
     </div>
 
-    <div class="actions">
-      <button id="btn-save-settings" class="btn btn--primary">Save Settings</button>
+    <div class="form-group">
+      <label>Default Priority</label>
+      <select id="settings-default-priority"></select>
     </div>
-  </main>
+
+    <div class="form-group">
+      <label>Default Source</label>
+      <select id="settings-default-source"></select>
+    </div>
+
+    <div class="form-group">
+      <label>Default Inbound Mailbox</label>
+      <select id="settings-default-mailbox">
+        <option value="">— None —</option>
+      </select>
+    </div>
+
+    <div class="toggle-row">
+      <span class="toggle-label">Auto-open task pane on email open</span>
+      <label class="toggle">
+        <input type="checkbox" id="settings-auto-open" />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <hr />
+
+    <div class="form-footer-row">
+      <button class="btn btn-primary btn-sm" id="btn-save-settings">Save Defaults</button>
+      <button class="btn btn-secondary btn-sm" id="btn-back">Back</button>
+    </div>
+  </div>
 
   <script type="module" src="taskpane.js"></script>
 </body>

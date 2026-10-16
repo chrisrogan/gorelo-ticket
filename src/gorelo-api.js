@@ -1,173 +1,143 @@
-/**
- * Gorelo Ticket - API Client
- * All calls to gw.usw.gorelo.tech use the same headers and Bearer token.
- *
- * NOTE: This uses Gorelo's internal API gateway, reverse-engineered from
- * browser traffic. Gorelo has not officially documented these endpoints.
- * They may change without notice. See README for details.
- */
+/* gorelo-api.js — All calls to the Gorelo Public API (api.usw.gorelo.io).
+   Authentication: X-API-Key header using the key stored in RoamingSettings. */
 
-import { getToken } from './auth/auth.js';
+import { getApiKey } from './auth/auth.js';
 
-const BASE_URL = 'https://gw.usw.gorelo.tech';
-const API_VERSION = '1.0';
+const BASE = 'https://api.usw.gorelo.io';
 
-/**
- * Core fetch wrapper with Gorelo auth headers.
- */
-async function gorelofetch(path, options = {}) {
-  const token = await getToken();
+function headers() {
+  return {
+    'X-API-Key': getApiKey(),
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+}
 
-  const url = `${BASE_URL}${path}${path.includes('?') ? '&' : '?'}api-version=${API_VERSION}&AppType=Web`;
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'apptype': 'Web',
-      'iscustomdomain': '1',
-      ...(options.headers || {}),
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`Gorelo API error ${response.status}: ${text}`);
+async function apiGet(path) {
+  const res = await fetch(BASE + path, { headers: headers() });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Gorelo API ${res.status}: ${text || res.statusText}`);
   }
-
-  return response.json();
+  return res.json();
 }
 
-// ─── Lookup endpoints ────────────────────────────────────────────────────────
-
-export async function getClients() {
-  // Returns clientEntity array from Gorelo
-  return gorelofetch('/client/v1/client/list');
+async function apiPost(path, body) {
+  const res = await fetch(BASE + path, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Gorelo API ${res.status}: ${text || res.statusText}`);
+  }
+  // Some endpoints return 204 No Content
+  const ct = res.headers.get('content-type') || '';
+  if (res.status === 204 || !ct.includes('application/json')) return null;
+  return res.json();
 }
 
-export async function getContacts(clientId = null) {
-  const path = clientId
-    ? `/contact/v1/contact/list?ClientId=${clientId}`
-    : '/contact/v1/contact/list';
-  return gorelofetch(path);
+// ─── Lookups ─────────────────────────────────────────────────────────────────
+
+export async function getClients(search = '') {
+  const q = search ? `&Search=${encodeURIComponent(search)}` : '';
+  const data = await apiGet(`/v1/clients?PageSize=50&PageNumber=1${q}`);
+  // API returns { items: [...] } or a plain array depending on version
+  return Array.isArray(data) ? data : (data.items ?? data.data ?? []);
+}
+
+export async function getContacts(clientId) {
+  const q = clientId ? `?ClientId=${clientId}&PageSize=100&PageNumber=1` : '?PageSize=100&PageNumber=1';
+  const data = await apiGet(`/v1/contacts${q}`);
+  return Array.isArray(data) ? data : (data.items ?? data.data ?? []);
 }
 
 export async function getTechnicianGroups() {
-  return gorelofetch('/ticket/v1/techniciangroup/list');
+  const data = await apiGet('/v1/technician-groups?PageSize=100&PageNumber=1');
+  return Array.isArray(data) ? data : (data.items ?? data.data ?? []);
 }
 
-export async function getTechnicians() {
-  return gorelofetch('/ticket/v1/technician/dropdown');
+export async function getTechnicians(groupId) {
+  const q = groupId ? `?TechnicianGroupId=${groupId}&PageSize=100&PageNumber=1` : '?PageSize=100&PageNumber=1';
+  const data = await apiGet(`/v1/technicians${q}`);
+  return Array.isArray(data) ? data : (data.items ?? data.data ?? []);
 }
 
 export async function getTags() {
-  return gorelofetch('/ticket/v1/tag/list');
-}
-
-export async function getAssets(clientId = null) {
-  const path = clientId
-    ? `/asset/v1/asset/list?ClientId=${clientId}`
-    : '/asset/v1/asset/list';
-  return gorelofetch(path);
-}
-
-export async function getLocations() {
-  return gorelofetch('/ticket/v1/location/list');
-}
-
-export async function getPriorities() {
-  return gorelofetch('/ticket/v1/ticket/priority/list');
-}
-
-export async function getSources() {
-  return gorelofetch('/ticket/v1/ticket/source/list');
+  const data = await apiGet('/v1/tags?PageSize=200&PageNumber=1');
+  return Array.isArray(data) ? data : (data.items ?? data.data ?? []);
 }
 
 export async function getEmailConfigurations() {
-  return gorelofetch('/ticket/v1/emailconfiguration/list');
+  const data = await apiGet('/v1/email-configurations?PageSize=50&PageNumber=1');
+  return Array.isArray(data) ? data : (data.items ?? data.data ?? []);
 }
 
-// ─── Ticket creation ─────────────────────────────────────────────────────────
+// Static lookups — these don't change and match the values confirmed from
+// the Gorelo Vuex store / network capture.
+export const PRIORITIES = [
+  { id: 1, name: 'High' },
+  { id: 2, name: 'Normal' },
+  { id: 3, name: 'Low' },
+  { id: 4, name: 'Urgent' },
+  { id: 5, name: 'No Priority' },
+];
+
+export const SOURCES = [
+  { id: 1, name: 'Web' },
+  { id: 2, name: 'Email' },
+  { id: 3, name: 'Phone' },
+  { id: 4, name: 'Chat' },
+  { id: 5, name: 'Alert' },
+  { id: 6, name: 'API' },
+];
+
+// ─── Ticket creation ──────────────────────────────────────────────────────────
 
 /**
- * Create a ticket in Gorelo.
+ * Creates a ticket via POST /v1/tickets.
  *
- * @param {object} params
- * @param {string}   params.title              - Ticket title/subject
- * @param {string}   params.description        - HTML body (ticket description)
- * @param {string}   params.markdownComment    - Plain text initial comment
- * @param {number}   params.clientId
- * @param {string}   params.clientName
- * @param {number}   params.contactId
- * @param {string}   params.outboundContactEmail - Original sender email address
- * @param {number[]} params.technicianGroupIds
- * @param {number}   params.assignedToId
- * @param {number}   params.priorityId          - 1=High, 2=Normal, 3=Low, 4=Urgent
- * @param {number}   params.sourceId            - 1=Web, 2=Email, 3=Phone etc.
- * @param {number}   params.emailConfigurationId
- * @param {number}   params.ticketLocation
- * @param {number[]} params.tagIds
- * @param {string[]} params.deviceIds           - Asset GUIDs
- * @param {boolean}  params.sendTicketCreatedEmail
- * @param {boolean}  params.onSite
+ * @param {object} opts
+ * @param {string}   opts.title
+ * @param {string}   opts.description        Plain text / HTML body
+ * @param {string}   opts.markdownComment    Markdown version of body (can equal description)
+ * @param {number}   [opts.clientId]
+ * @param {string}   [opts.clientName]
+ * @param {number}   [opts.contactId]
+ * @param {string}   [opts.outboundContactEmail]
+ * @param {number[]} [opts.technicianGroupIds]
+ * @param {number}   [opts.assignedToId]
+ * @param {number}   [opts.priorityId]       1=High 2=Normal 3=Low 4=Urgent
+ * @param {number}   [opts.sourceId]         2=Email
+ * @param {string[]} [opts.newTags]          Tag names to create
+ * @param {string[]} [opts.existingTagIds]   Existing tag IDs
+ * @param {number}   [opts.emailConfigurationId]
+ * @param {boolean}  [opts.sendNotification]
  */
-export async function createTicket(params) {
+export async function createTicket(opts) {
   const payload = {
-    // Core fields
-    TicketTitle: params.title,
-    TicketDescription: params.description || `<p>${params.markdownComment || ''}</p>`,
-    markdownComment: params.markdownComment || '',
-
-    // Client & contact
-    ClientId: params.clientId,
-    ClientName: params.clientName,
-    ContactId: params.contactId || 0,
-    outboundContactEmail: params.outboundContactEmail || '',
-
-    // Assignment
-    technicianGroupIds: params.technicianGroupIds || [],
-    AssignedToId: params.assignedToId || 0,
-
-    // Ticket metadata
-    TicketPriorityId: params.priorityId || 2,       // Default: Normal
-    TicketSeverityId: params.severityId || 3,        // Default: Medium
-    TicketSourceId: params.sourceId || 2,            // Default: Email
-    TicketStatusId: 1,                               // Open
-    TypeId: null,
-
-    // Email & location
-    emailConfigurationId: params.emailConfigurationId,
-    ticketLocation: params.ticketLocation || 0,
-
-    // Tags & assets
-    NewTicketTags: params.tagIds || [],
-    OldTicketTags: params.tagIds || [],
-    TicketDeviceIds: params.deviceIds || [],
-    TicketCustomAssetIds: [],
-    TicketNodeChecks: [],
-
-    // Notification options
-    sendTicketCreatedEmail: params.sendTicketCreatedEmail !== false,
-    doNotEmailCheck: false,
-    sendSelfMentionNotification: false,
+    TicketTitle: opts.title,
+    TicketDescription: opts.description || '',
+    markdownComment: opts.markdownComment || opts.description || '',
+    ClientId: opts.clientId || 0,
+    ClientName: opts.clientName || '',
+    ContactId: opts.contactId || 0,
+    outboundContactEmail: opts.outboundContactEmail || '',
+    technicianGroupIds: opts.technicianGroupIds || [],
+    AssignedToId: opts.assignedToId || 0,
+    TicketPriorityId: opts.priorityId || 2,
+    TicketSeverityId: null,
+    TicketSourceId: opts.sourceId || 2,      // Email
+    TicketStatusId: 1,                        // Open
+    emailConfigurationId: opts.emailConfigurationId || null,
+    ticketLocation: opts.ticketLocation || 0,
+    NewTicketTags: opts.newTags || [],
+    OldTicketTags: opts.existingTagIds || [],
+    TicketDeviceIds: [],
+    sendTicketCreatedEmail: opts.sendNotification !== false,
     isFromWeb: true,
-    isTicketCreatedThroughAlert: false,
-    onSite: params.onSite || false,
-
-    // Relations
-    mentions: [],
-    mentionedTechnicianGroupIds: [],
-    secondaryContacts: [],
-    secondaryTechnicians: [],
-    watchers: [],
-    attachments: [],
-    deviceId: '',
   };
 
-  return gorelofetch('/ticket/v1/ticket/add', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  return apiPost('/v1/tickets', payload);
 }

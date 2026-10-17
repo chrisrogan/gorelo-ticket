@@ -3,7 +3,7 @@
 
 import { getApiKey } from './auth/auth.js';
 
-const BASE = 'https://api.usw.gorelo.io';
+const BASE = 'https://gorelo-proxy.chris-rogan.workers.dev';
 
 function headers() {
   return {

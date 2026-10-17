@@ -32,7 +32,7 @@ export async function validateApiKey(key) {
     return { valid: false, error: 'API key cannot be empty.' };
   }
   try {
-    const response = await fetch('https://api.usw.gorelo.io/v1/clients?PageSize=1', {
+    const response = await fetch('https://gorelo-proxy.chris-rogan.workers.dev/v1/clients?PageSize=1', {
       headers: {
         'X-API-Key': key.trim(),
         'Accept': 'application/json',

@@ -1,5 +1,16 @@
 /* gorelo-api.js — All calls to the Gorelo Public API (api.usw.gorelo.io).
-   Authentication: X-API-Key header using the key stored in RoamingSettings. */
+   Authentication: X-API-Key header using the key stored in RoamingSettings.
+
+   Real API shape (confirmed from live responses):
+   - Response wrapper: { StatusCode, IsSuccess, Data: [...], DataContext: { Pagination: { NextCursor, HasMore } } }
+   - Pagination: cursor-based using ?Cursor=<token>&PageSize=<n>  (no PageNumber)
+   - Clients:   Data[].{ Id, Name, Status, Domains[] }
+   - Contacts:  Data[].{ Id, FirstName, LastName, ClientId, PrimaryEmail }
+   - Users:     Data[].{ Id, FirstName, LastName, Email }
+   - Groups:    /v1/organization/groups  (no pagination params)
+   - Tags:      /v1/tickets/tags  (requires Tickets read scope)
+   - Tickets:   POST /v1/tickets
+*/
 
 import { getApiKey } from './auth/auth.js';
 
@@ -19,7 +30,12 @@ async function apiGet(path) {
     const text = await res.text().catch(() => '');
     throw new Error(`Gorelo API ${res.status}: ${text || res.statusText}`);
   }
-  return res.json();
+  const json = await res.json();
+  if (!json.IsSuccess) {
+    const msg = json.Notifications?.[0]?.Message || `Status ${json.StatusCode}`;
+    throw new Error(`Gorelo: ${msg}`);
+  }
+  return json;
 }
 
 async function apiPost(path, body) {
@@ -32,50 +48,86 @@ async function apiPost(path, body) {
     const text = await res.text().catch(() => '');
     throw new Error(`Gorelo API ${res.status}: ${text || res.statusText}`);
   }
-  // Some endpoints return 204 No Content
   const ct = res.headers.get('content-type') || '';
   if (res.status === 204 || !ct.includes('application/json')) return null;
-  return res.json();
+  const json = await res.json();
+  if (json.IsSuccess === false) {
+    const msg = json.Notifications?.[0]?.Message || `Status ${json.StatusCode}`;
+    throw new Error(`Gorelo: ${msg}`);
+  }
+  return json.Data ?? json;
+}
+
+/** Unwrap Data array from standard response */
+function unwrap(json) {
+  return Array.isArray(json.Data) ? json.Data : [];
 }
 
 // ─── Lookups ─────────────────────────────────────────────────────────────────
 
 export async function getClients(search = '') {
   const q = search ? `&Search=${encodeURIComponent(search)}` : '';
-  const data = await apiGet(`/v1/clients?PageSize=50&PageNumber=1${q}`);
-  // API returns { items: [...] } or a plain array depending on version
-  return Array.isArray(data) ? data : (data.items ?? data.data ?? []);
+  const json = await apiGet(`/v1/clients?PageSize=200${q}`);
+  // Map to consistent shape: { id, name }
+  return unwrap(json).map(c => ({ id: c.Id, name: c.Name }));
 }
 
 export async function getContacts(clientId) {
-  const q = clientId ? `?ClientId=${clientId}&PageSize=100&PageNumber=1` : '?PageSize=100&PageNumber=1';
-  const data = await apiGet(`/v1/contacts${q}`);
-  return Array.isArray(data) ? data : (data.items ?? data.data ?? []);
+  const q = clientId ? `?ClientId=${clientId}&PageSize=200` : '?PageSize=200';
+  const json = await apiGet(`/v1/contacts${q}`);
+  // Map to consistent shape: { id, name, clientId, email }
+  return unwrap(json).map(c => ({
+    id: c.Id,
+    name: [c.FirstName, c.LastName].filter(Boolean).join(' ') || c.PrimaryEmail || `Contact #${c.Id}`,
+    clientId: c.ClientId,
+    email: c.PrimaryEmail || '',
+  }));
 }
 
 export async function getTechnicianGroups() {
-  const data = await apiGet('/v1/technician-groups?PageSize=100&PageNumber=1');
-  return Array.isArray(data) ? data : (data.items ?? data.data ?? []);
+  // /v1/organization/groups does not accept PageSize/PageNumber
+  const json = await apiGet('/v1/organization/groups');
+  return unwrap(json).map(g => ({ id: g.Id, name: g.Name }));
 }
 
 export async function getTechnicians(groupId) {
-  const q = groupId ? `?TechnicianGroupId=${groupId}&PageSize=100&PageNumber=1` : '?PageSize=100&PageNumber=1';
-  const data = await apiGet(`/v1/technicians${q}`);
-  return Array.isArray(data) ? data : (data.items ?? data.data ?? []);
+  // Users endpoint — filter by group if supported, otherwise return all
+  const q = groupId ? `?GroupId=${groupId}&PageSize=200` : '?PageSize=200';
+  try {
+    const json = await apiGet(`/v1/organization/users${q}`);
+    return unwrap(json).map(u => ({
+      id: u.Id,
+      name: [u.FirstName, u.LastName].filter(Boolean).join(' ') || u.Email || `User #${u.Id}`,
+      email: u.Email || '',
+    }));
+  } catch {
+    // GroupId filter may not be supported — fall back to all users
+    const json = await apiGet('/v1/organization/users?PageSize=200');
+    return unwrap(json).map(u => ({
+      id: u.Id,
+      name: [u.FirstName, u.LastName].filter(Boolean).join(' ') || u.Email || `User #${u.Id}`,
+      email: u.Email || '',
+    }));
+  }
 }
 
 export async function getTags() {
-  const data = await apiGet('/v1/tags?PageSize=200&PageNumber=1');
-  return Array.isArray(data) ? data : (data.items ?? data.data ?? []);
+  // Requires 'Tickets' read scope on the API key.
+  // Returns empty array gracefully if the key lacks that permission.
+  try {
+    const json = await apiGet('/v1/tickets/tags?PageSize=200');
+    return unwrap(json).map(t => ({ id: t.Id, name: t.Name || t.TagName || '' }));
+  } catch {
+    return [];
+  }
 }
 
 export async function getEmailConfigurations() {
-  const data = await apiGet('/v1/email-configurations?PageSize=50&PageNumber=1');
-  return Array.isArray(data) ? data : (data.items ?? data.data ?? []);
+  // Not present in the Public API — return empty array.
+  return [];
 }
 
-// Static lookups — these don't change and match the values confirmed from
-// the Gorelo Vuex store / network capture.
+// Static lookups — values confirmed from Gorelo UI
 export const PRIORITIES = [
   { id: 1, name: 'High' },
   { id: 2, name: 'Normal' },
@@ -101,7 +153,7 @@ export const SOURCES = [
  * @param {object} opts
  * @param {string}   opts.title
  * @param {string}   opts.description        Plain text / HTML body
- * @param {string}   opts.markdownComment    Markdown version of body (can equal description)
+ * @param {string}   opts.markdownComment    Markdown version of body
  * @param {number}   [opts.clientId]
  * @param {string}   [opts.clientName]
  * @param {number}   [opts.contactId]
@@ -128,8 +180,8 @@ export async function createTicket(opts) {
     AssignedToId: opts.assignedToId || 0,
     TicketPriorityId: opts.priorityId || 2,
     TicketSeverityId: null,
-    TicketSourceId: opts.sourceId || 2,      // Email
-    TicketStatusId: 1,                        // Open
+    TicketSourceId: opts.sourceId || 2,
+    TicketStatusId: 1,
     emailConfigurationId: opts.emailConfigurationId || null,
     ticketLocation: opts.ticketLocation || 0,
     NewTicketTags: opts.newTags || [],

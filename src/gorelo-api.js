@@ -12,7 +12,7 @@
    - Tickets:   POST /v1/tickets
 */
 
-import { getApiKey } from './auth/auth.js';
+import { getApiKey } from './auth/auth.js?v=2';
 
 const BASE = 'https://gorelo-proxy.chris-rogan.workers.dev';
 
@@ -60,54 +60,83 @@ async function apiPost(path, body) {
 
 /** Unwrap Data array from standard response */
 function unwrap(json) {
-  return Array.isArray(json.Data) ? json.Data : [];
+  const data = json.Data ?? json.data ?? json;
+  const arr = Array.isArray(data) ? data : [];
+  if (arr.length > 0) {
+    console.log('[Gorelo] sample item keys:', Object.keys(arr[0]));
+  }
+  return arr;
 }
 
 // ─── Lookups ─────────────────────────────────────────────────────────────────
 
+/** Read a field that may be PascalCase or camelCase */
+function f(obj, ...keys) {
+  for (const k of keys) {
+    if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k];
+  }
+  return '';
+}
+
 export async function getClients(search = '') {
   const q = search ? `&Search=${encodeURIComponent(search)}` : '';
   const json = await apiGet(`/v1/clients?PageSize=200${q}`);
-  // Map to consistent shape: { id, name }
-  return unwrap(json).map(c => ({ id: c.Id, name: c.Name }));
+  return unwrap(json).map(c => ({
+    id: f(c, 'Id', 'id', 'clientId', 'ClientId'),
+    name: f(c, 'Name', 'name', 'clientName', 'ClientName'),
+  }));
 }
 
 export async function getContacts(clientId) {
   const q = clientId ? `?ClientId=${clientId}&PageSize=200` : '?PageSize=200';
   const json = await apiGet(`/v1/contacts${q}`);
-  // Map to consistent shape: { id, name, clientId, email }
-  return unwrap(json).map(c => ({
-    id: c.Id,
-    name: [c.FirstName, c.LastName].filter(Boolean).join(' ') || c.PrimaryEmail || `Contact #${c.Id}`,
-    clientId: c.ClientId,
-    email: c.PrimaryEmail || '',
-  }));
+  return unwrap(json).map(c => {
+    const first = f(c, 'FirstName', 'firstName');
+    const last = f(c, 'LastName', 'lastName');
+    const email = f(c, 'PrimaryEmail', 'primaryEmail', 'emailAddress', 'EmailAddress');
+    return {
+      id: f(c, 'Id', 'id', 'contactId', 'ContactId'),
+      name: [first, last].filter(Boolean).join(' ') || email || `Contact #${c.Id || c.id}`,
+      clientId: f(c, 'ClientId', 'clientId'),
+      email,
+    };
+  });
 }
 
 export async function getTechnicianGroups() {
-  // /v1/organization/groups does not accept PageSize/PageNumber
   const json = await apiGet('/v1/organization/groups');
-  return unwrap(json).map(g => ({ id: g.Id, name: g.Name }));
+  return unwrap(json).map(g => ({
+    id: f(g, 'Id', 'id', 'groupId', 'GroupId'),
+    name: f(g, 'Name', 'name'),
+  }));
 }
 
 export async function getTechnicians(groupId) {
-  // Users endpoint — filter by group if supported, otherwise return all
   const q = groupId ? `?GroupId=${groupId}&PageSize=200` : '?PageSize=200';
   try {
     const json = await apiGet(`/v1/organization/users${q}`);
-    return unwrap(json).map(u => ({
-      id: u.Id,
-      name: [u.FirstName, u.LastName].filter(Boolean).join(' ') || u.Email || `User #${u.Id}`,
-      email: u.Email || '',
-    }));
+    return unwrap(json).map(u => {
+      const first = f(u, 'FirstName', 'firstName');
+      const last = f(u, 'LastName', 'lastName');
+      const email = f(u, 'Email', 'email');
+      return {
+        id: f(u, 'Id', 'id', 'userId', 'UserId'),
+        name: [first, last].filter(Boolean).join(' ') || email || `User #${u.Id || u.id}`,
+        email,
+      };
+    });
   } catch {
-    // GroupId filter may not be supported — fall back to all users
     const json = await apiGet('/v1/organization/users?PageSize=200');
-    return unwrap(json).map(u => ({
-      id: u.Id,
-      name: [u.FirstName, u.LastName].filter(Boolean).join(' ') || u.Email || `User #${u.Id}`,
-      email: u.Email || '',
-    }));
+    return unwrap(json).map(u => {
+      const first = f(u, 'FirstName', 'firstName');
+      const last = f(u, 'LastName', 'lastName');
+      const email = f(u, 'Email', 'email');
+      return {
+        id: f(u, 'Id', 'id', 'userId', 'UserId'),
+        name: [first, last].filter(Boolean).join(' ') || email || `User #${u.Id || u.id}`,
+        email,
+      };
+    });
   }
 }
 

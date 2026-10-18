@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+x<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -534,6 +534,9 @@
     </div>
   </div>
 
-  <script type="module" src="taskpane.js?v=2"></script>
+    <script type="module">
+    const v = Date.now();
+    const m = await import(`./taskpane.js?v=${v}`);
+  </script>
 </body>
 </html>

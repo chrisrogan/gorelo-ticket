@@ -198,83 +198,40 @@ export const SOURCES = [
  * @param {boolean}  [opts.sendNotification]
  */
 export async function createTicket(opts) {
-  // Strip problematic Unicode (zero-width spaces, soft hyphens, BOM, C0 controls)
-  // that cause Gorelo's API to return 400 "Invalid or malformed request body"
   function sanitise(str) {
     if (!str) return '';
     return str
-      .replace(/<[^>]*>/g, ' ')                                              // strip HTML tags
-      .replace(/&[a-z]+;|&#[0-9]+;|&#x[0-9a-f]+;/gi, ' ')                  // HTML entities
-      .replace(/[\u00ad\u200b-\u200f\u2028\u2029\ufeff\u180e]/g, '') // soft-hyphen, ZWS
-      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '') // C0 controls
-      .replace(/\s+/g, ' ')                                                  // collapse whitespace
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&[a-z]+;|&#[0-9]+;|&#x[0-9a-f]+;/gi, ' ')
+      .replace(/[\u00ad\u200b-\u200f\u2028\u2029\ufeff\u180e]/g, '')
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+      .replace(/\s+/g, ' ')
       .trim();
   }
 
-  // Build payload omitting null/empty optional fields to avoid Gorelo 400s
+  let description = sanitise(opts.description);
+  if (description.length > 2000) {
+    description = description.substring(0, 1997) + '...';
+  }
+
+  // Field names confirmed from Gorelo API spec (no "Ticket" prefix on most fields)
   const payload = {
-    TicketTitle: sanitise(opts.title),
-    TicketDescription: sanitise(opts.description),
-    TicketPriorityId: opts.priorityId || 2,
-    TicketSourceId: opts.sourceId || 2,
-    TicketStatusId: 1,
-    SendTicketCreatedEmail: opts.sendNotification !== false,
+    Title: sanitise(opts.title),
+    Description: description,
+    PriorityId: opts.priorityId || 2,
+    SourceId: opts.sourceId || 2,
+    StatusId: opts.statusId || 1,
+    TypeId: opts.typeId || 1,
+    SendCreatedEmail: opts.sendNotification !== false,
   };
 
-  // Only include optional fields when they have values
   if (opts.clientId)                   payload.ClientId = opts.clientId;
   if (opts.contactId)                  payload.ContactId = opts.contactId;
-  if (opts.technicianGroupIds?.length) payload.TechnicianGroupId = opts.technicianGroupIds[0];
-  if (opts.assignedToId)               payload.AssignedToId = opts.assignedToId;
-  if (opts.emailConfigurationId)       payload.EmailConfigurationId = opts.emailConfigurationId;
-  if (opts.newTags?.length)            payload.NewTicketTags = opts.newTags;
-  if (opts.existingTagIds?.length)     payload.OldTicketTags = opts.existingTagIds;
-
-  // Truncate description to avoid hitting Gorelo's field length limit
-  if (payload.TicketDescription && payload.TicketDescription.length > 2000) {
-    payload.TicketDescription = payload.TicketDescription.substring(0, 1997) + '...';
-  }
+  if (opts.technicianGroupIds?.length) payload.GroupIds = opts.technicianGroupIds;
+  if (opts.assignedToId)               payload.LeadAssigneeId = opts.assignedToId;
+  if (opts.newTags?.length)            payload.NewTagNames = opts.newTags;
+  if (opts.existingTagIds?.length)     payload.TagIds = opts.existingTagIds.map(Number);
 
   console.log('[Gorelo] createTicket payload:', JSON.stringify(payload));
-
-  // DIAGNOSTIC PHASE 2: try completely hardcoded static payload (no user input at all)
-  // to determine if the 400 is caused by ANY dynamic content or is a scope/key issue
-  const hardcodedPayload = {
-    TicketTitle: 'Test Ticket From Add-In',
-    TicketDescription: 'This is a test ticket with a completely static description.',
-    TicketPriorityId: 2,
-    TicketSourceId: 2,
-    TicketStatusId: 1,
-    SendTicketCreatedEmail: false,
-  };
-  console.log('[Gorelo] trying HARDCODED static payload:', JSON.stringify(hardcodedPayload));
-  try {
-    const result = await apiPost('/v1/tickets', hardcodedPayload);
-    console.log('[Gorelo] HARDCODED payload SUCCEEDED - dynamic content is the problem');
-    return result;
-  } catch (hardErr) {
-    console.warn('[Gorelo] HARDCODED payload ALSO failed:', hardErr.message);
-    console.warn('[Gorelo] This means the API key likely lacks ticket-creation scope, or field names are wrong');
-  }
-
-  // Also try dynamic minimal payload for comparison
-  const minPayload = {
-    TicketTitle: payload.TicketTitle,
-    TicketDescription: payload.TicketDescription,
-    TicketPriorityId: payload.TicketPriorityId,
-    TicketSourceId: payload.TicketSourceId,
-    TicketStatusId: payload.TicketStatusId,
-    SendTicketCreatedEmail: payload.SendTicketCreatedEmail,
-  };
-  console.log('[Gorelo] trying dynamic minimal payload:', JSON.stringify(minPayload));
-  try {
-    const result = await apiPost('/v1/tickets', minPayload);
-    console.log('[Gorelo] dynamic minimal payload SUCCEEDED');
-    return result;
-  } catch (minErr) {
-    console.warn('[Gorelo] dynamic minimal payload ALSO failed:', minErr.message);
-  }
-
-  console.log('[Gorelo] trying full payload...');
   return apiPost('/v1/tickets', payload);
 }

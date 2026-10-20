@@ -273,15 +273,13 @@ async function submitTicket() {
   hideFormAlert();
 
   try {
+    const groupIdNum = groupId ? Number(groupId) : null;
     const result = await createTicket({
       title: subject,
       description: getVal('field-notes'),
-      markdownComment: getVal('field-notes'),
       clientId: intVal('field-client'),
-      clientName: getVal('field-client') ? document.getElementById('field-client').selectedOptions[0]?.text : '',
       contactId: intVal('field-contact'),
-      outboundContactEmail: Office.context.mailbox.item?.from?.emailAddress || '',
-      technicianGroupIds: groupId ? [Number(groupId)] : [],
+      technicianGroupIds: (groupIdNum && groupIdNum > 0) ? [groupIdNum] : [],
       assignedToId: intVal('field-assignee'),
       priorityId: intVal('field-priority') || 2,
       sourceId: intVal('field-source') || 2,

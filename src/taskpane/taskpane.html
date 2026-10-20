@@ -1,5 +1,5 @@
 x<!DOCTYPE html>
-<!-- v20261020113143 -->
+<!-- v20261020114233_20261020113143 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -539,8 +539,15 @@ x<!DOCTYPE html>
   </div>
 
     <script type="module">
-    const v = Date.now();
-    const m = await import(`./taskpane.js?v=${v}`);
+    try {
+      const v = Date.now();
+      console.log('[Gorelo] loading taskpane.js?v=' + v);
+      const m = await import(`./taskpane.js?v=${v}`);
+      console.log('[Gorelo] taskpane.js loaded OK');
+    } catch (err) {
+      console.error('[Gorelo] FATAL: taskpane.js failed to load:', err);
+      document.body.innerHTML = '<div style="padding:1rem;color:red;font-family:sans-serif"><b>Add-in load error</b><br>' + err + '</div>';
+    }
   </script>
 </body>
 </html>

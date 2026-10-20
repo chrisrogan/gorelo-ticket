@@ -1,6 +1,8 @@
 /* taskpane.js — Full task pane controller.
    Handles the Create Ticket form and Settings view. */
 
+console.log('[Gorelo] taskpane.js module start');
+
 // Extract the cache-busting ?v= param that taskpane.html injected into our URL.
 // This ensures all sub-modules are also fetched with the same fresh timestamp.
 const _v = new URL(import.meta.url).searchParams.get('v') || Date.now();

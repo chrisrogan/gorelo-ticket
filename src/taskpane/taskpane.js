@@ -82,7 +82,10 @@ async function loadFormDropdowns() {
   if (groups.status === 'fulfilled') {
     populateSelect('field-group', groups.value, 'id', 'name', '', '— Select group —');
     const defaultGroup = getSetting('defaultTechnicianGroupId');
-    if (defaultGroup) setVal('field-group', String(defaultGroup));
+    if (defaultGroup) {
+      setVal('field-group', String(defaultGroup));
+      onGroupChange(String(defaultGroup));  // load assignees for default group
+    }
   }
 
   // Tags cache
@@ -256,8 +259,8 @@ async function submitTicket() {
   const subject = getVal('field-subject').trim();
   const groupId = getVal('field-group');
 
-  if (!subject) return showFormAlert('Please enter a ticket title.', 'error');
-  if (!groupId) return showFormAlert('Please select a group (required by Gorelo).', 'error');
+  if (!subject) { showFormAlert('Please enter a ticket title.', 'error'); scrollToAlert(); return; }
+  if (!groupId) { showFormAlert('Please select a group (required by Gorelo).', 'error'); scrollToAlert(); return; }
 
   setSubmitting(true);
   hideFormAlert();
@@ -383,7 +386,8 @@ async function validateAndSaveApiKey() {
 
 // ─── Event wiring ─────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
+// DOM is already ready (module loaded dynamically after DOMContentLoaded)
+;(() => {
   // Header buttons
   document.getElementById('btn-settings').addEventListener('click', async () => {
     showView('settings');
@@ -471,6 +475,10 @@ function setSubmitting(on) {
   btn.disabled = on;
   text.textContent = on ? 'Creating…' : 'Create Ticket';
   spinner.classList.toggle('hidden', !on);
+}
+
+function scrollToAlert() {
+  document.getElementById('form-alert')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function showFormAlert(msg, type) {

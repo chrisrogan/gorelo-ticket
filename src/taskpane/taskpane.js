@@ -1,13 +1,13 @@
 /* taskpane.js — Full task pane controller.
    Handles the Create Ticket form and Settings view. */
 
-import { isAuthenticated, validateApiKey } from '../auth/auth.js?v=2';
+import { isAuthenticated, validateApiKey } from '../auth/auth.js?v=3';
 import {
   getClients, getContacts, getTechnicianGroups, getTechnicians,
   getTags, getEmailConfigurations, createTicket,
   PRIORITIES, SOURCES,
-} from '../gorelo-api.js?v=2';
-import { getSetting, saveSettings, getAllSettings } from '../settings.js?v=2';
+} from '../gorelo-api.js?v=3';
+import { getSetting, saveSettings, getAllSettings } from '../settings.js?v=3';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 

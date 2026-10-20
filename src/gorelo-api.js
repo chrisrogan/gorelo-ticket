@@ -12,7 +12,8 @@
    - Tickets:   POST /v1/tickets
 */
 
-import { getApiKey } from './auth/auth.js?v=3';
+const _v = new URL(import.meta.url).searchParams.get('v') || Date.now();
+const { getApiKey } = await import(`./auth/auth.js?v=${_v}`);
 
 const BASE = 'https://gorelo-proxy.chris-rogan.workers.dev';
 

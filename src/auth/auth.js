@@ -1,7 +1,8 @@
 /* auth.js — API key authentication for Gorelo Public API.
    Replaces the previous MSAL B2C implementation. */
 
-import { getSetting } from '../settings.js?v=3';
+const _v = new URL(import.meta.url).searchParams.get('v') || Date.now();
+const { getSetting } = await import(`../settings.js?v=${_v}`);
 
 /**
  * Returns the stored API key, throwing a user-friendly error if absent.

@@ -1,13 +1,17 @@
 /* taskpane.js — Full task pane controller.
    Handles the Create Ticket form and Settings view. */
 
-import { isAuthenticated, validateApiKey } from '../auth/auth.js?v=3';
-import {
+// Extract the cache-busting ?v= param that taskpane.html injected into our URL.
+// This ensures all sub-modules are also fetched with the same fresh timestamp.
+const _v = new URL(import.meta.url).searchParams.get('v') || Date.now();
+
+const { isAuthenticated, validateApiKey } = await import(`../auth/auth.js?v=${_v}`);
+const {
   getClients, getContacts, getTechnicianGroups, getTechnicians,
   getTags, getEmailConfigurations, createTicket,
   PRIORITIES, SOURCES,
-} from '../gorelo-api.js?v=3';
-import { getSetting, saveSettings, getAllSettings } from '../settings.js?v=3';
+} = await import(`../gorelo-api.js?v=${_v}`);
+const { getSetting, saveSettings, getAllSettings } = await import(`../settings.js?v=${_v}`);
 
 // ─── State ────────────────────────────────────────────────────────────────────
 

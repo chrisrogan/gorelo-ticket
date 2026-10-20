@@ -80,7 +80,7 @@ async function loadFormDropdowns() {
 
   // Groups
   if (groups.status === 'fulfilled') {
-    populateSelect('field-group', groups.value, 'technicianGroupId', 'name', '', '— Select group —');
+    populateSelect('field-group', groups.value, 'id', 'name', '', '— Select group —');
     const defaultGroup = getSetting('defaultTechnicianGroupId');
     if (defaultGroup) setVal('field-group', String(defaultGroup));
   }
@@ -92,7 +92,7 @@ async function loadFormDropdowns() {
 
   // Mailboxes
   if (mailboxes.status === 'fulfilled') {
-    populateSelect('field-mailbox', mailboxes.value, 'emailConfigurationId', 'emailAddress', '', '— None —');
+    populateSelect('field-mailbox', mailboxes.value, 'id', 'name', '', '— None —');
     const defaultMailbox = getSetting('defaultEmailConfigurationId');
     if (defaultMailbox) setVal('field-mailbox', String(defaultMailbox));
   }
@@ -111,7 +111,7 @@ async function loadFormDropdowns() {
 async function loadClients() {
   try {
     const clients = await getClients();
-    populateSelect('field-client', clients, 'clientId', 'clientName', '', '— Select client —');
+    populateSelect('field-client', clients, 'id', 'name', '', '— Select client —');
 
     // Auto-match by sender email
     const fromEmail = Office.context.mailbox.item?.from?.emailAddress || '';
@@ -128,11 +128,11 @@ async function tryAutoMatchClient(email, clients) {
   try {
     const contacts = await getContacts();
     const match = contacts.find(c =>
-      (c.emailAddress || '').toLowerCase() === email.toLowerCase()
+      (c.email || '').toLowerCase() === email.toLowerCase()
     );
     if (match?.clientId) {
       setVal('field-client', String(match.clientId));
-      await onClientChange(match.clientId, match.contactId);
+      await onClientChange(match.clientId, match.id);
     }
   } catch { /* non-fatal */ }
 }
@@ -143,7 +143,7 @@ async function onClientChange(clientId, preselectContactId) {
 
   try {
     const contacts = await getContacts(clientId || null);
-    populateSelect('field-contact', contacts, 'contactId', 'fullNameWithClientName', '', '— Select contact —');
+    populateSelect('field-contact', contacts, 'id', 'name', '', '— Select contact —');
     if (preselectContactId) setVal('field-contact', String(preselectContactId));
   } catch {
     contactSel.innerHTML = '<option value="">— Select contact —</option>';
@@ -156,17 +156,7 @@ async function onGroupChange(groupId) {
 
   try {
     const techs = await getTechnicians(groupId || null);
-    populateSelect('field-assignee', techs, 'technicianId', firstName => {
-      // Callable name builder
-    }, '', '— Unassigned —');
-
-    // Rebuild properly with name formatting
-    assigneeSel.innerHTML = '<option value="">— Unassigned —</option>';
-    techs.forEach(t => {
-      const name = [t.firstName, t.lastName].filter(Boolean).join(' ') || t.email || `Tech #${t.technicianId}`;
-      const opt = new Option(name, t.technicianId);
-      assigneeSel.add(opt);
-    });
+    populateSelect('field-assignee', techs, 'id', 'name', '', '— Unassigned —');
 
     const defaultAssignee = getSetting('defaultAssignedToId');
     if (defaultAssignee) setVal('field-assignee', String(defaultAssignee));
@@ -328,20 +318,13 @@ async function loadSettingsView() {
     ]);
 
     if (groups.status === 'fulfilled') {
-      populateSelect('settings-default-group', groups.value, 'technicianGroupId', 'name', settings.defaultTechnicianGroupId || '', '— None —');
+      populateSelect('settings-default-group', groups.value, 'id', 'name', settings.defaultTechnicianGroupId || '', '— None —');
     }
     if (techs.status === 'fulfilled') {
-      const sel = document.getElementById('settings-default-assignee');
-      sel.innerHTML = '<option value="">— None —</option>';
-      techs.value.forEach(t => {
-        const name = [t.firstName, t.lastName].filter(Boolean).join(' ') || t.email;
-        const opt = new Option(name, t.technicianId);
-        if (String(t.technicianId) === String(settings.defaultAssignedToId)) opt.selected = true;
-        sel.add(opt);
-      });
+      populateSelect('settings-default-assignee', techs.value, 'id', 'name', settings.defaultAssignedToId || '', '— None —');
     }
     if (mailboxes.status === 'fulfilled') {
-      populateSelect('settings-default-mailbox', mailboxes.value, 'emailConfigurationId', 'emailAddress', settings.defaultEmailConfigurationId || '', '— None —');
+      populateSelect('settings-default-mailbox', mailboxes.value, 'id', 'name', settings.defaultEmailConfigurationId || '', '— None —');
     }
   } catch { /* non-fatal */ }
 

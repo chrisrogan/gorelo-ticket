@@ -435,7 +435,7 @@ async function validateAndSaveApiKey() {
       showView('setup');
     }
   });
-  document.getElementById('btn-show-key').addEventListener('click', () => {
+  on('btn-show-key', 'click', () => {
     const input = document.getElementById('settings-api-key');
     const btn = document.getElementById('btn-show-key');
     if (input.type === 'password') {
@@ -448,7 +448,7 @@ async function validateAndSaveApiKey() {
   });
 
   initTagInput();
-});
+})();
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 

@@ -201,25 +201,26 @@ export async function createTicket(opts) {
   const payload = {
     TicketTitle: opts.title,
     TicketDescription: opts.description || '',
-    markdownComment: opts.markdownComment || opts.description || '',
-    ClientId: opts.clientId || 0,
+    MarkdownComment: opts.markdownComment || opts.description || '',
+    ClientId: opts.clientId || null,
     ClientName: opts.clientName || '',
-    ContactId: opts.contactId || 0,
-    outboundContactEmail: opts.outboundContactEmail || '',
-    technicianGroupIds: opts.technicianGroupIds || [],
-    AssignedToId: opts.assignedToId || 0,
+    ContactId: opts.contactId || null,
+    OutboundContactEmail: opts.outboundContactEmail || '',
+    TechnicianGroupIds: opts.technicianGroupIds || [],
+    AssignedToId: opts.assignedToId || null,
     TicketPriorityId: opts.priorityId || 2,
     TicketSeverityId: null,
     TicketSourceId: opts.sourceId || 2,
     TicketStatusId: 1,
-    emailConfigurationId: opts.emailConfigurationId || null,
-    ticketLocation: opts.ticketLocation || 0,
+    EmailConfigurationId: opts.emailConfigurationId || null,
+    TicketLocation: opts.ticketLocation || 0,
     NewTicketTags: opts.newTags || [],
     OldTicketTags: opts.existingTagIds || [],
     TicketDeviceIds: [],
-    sendTicketCreatedEmail: opts.sendNotification !== false,
-    isFromWeb: true,
+    SendTicketCreatedEmail: opts.sendNotification !== false,
+    IsFromWeb: true,
   };
 
+  console.log('[Gorelo] createTicket payload:', JSON.stringify(payload));
   return apiPost('/v1/tickets', payload);
 }

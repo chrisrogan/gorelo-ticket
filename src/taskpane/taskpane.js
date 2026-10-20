@@ -475,8 +475,9 @@ function setVal(id, val) {
 }
 function intVal(id) {
   const v = getVal(id);
+  if (!v) return null;
   const n = parseInt(v, 10);
-  return isNaN(n) ? 0 : n;
+  return isNaN(n) ? null : n;
 }
 
 function setSubmitting(on) {

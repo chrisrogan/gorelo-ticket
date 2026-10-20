@@ -237,8 +237,27 @@ export async function createTicket(opts) {
 
   console.log('[Gorelo] createTicket payload:', JSON.stringify(payload));
 
-  // DIAGNOSTIC: try bare-minimum payload first to isolate whether 400 is
-  // caused by field names/values or by description content
+  // DIAGNOSTIC PHASE 2: try completely hardcoded static payload (no user input at all)
+  // to determine if the 400 is caused by ANY dynamic content or is a scope/key issue
+  const hardcodedPayload = {
+    TicketTitle: 'Test Ticket From Add-In',
+    TicketDescription: 'This is a test ticket with a completely static description.',
+    TicketPriorityId: 2,
+    TicketSourceId: 2,
+    TicketStatusId: 1,
+    SendTicketCreatedEmail: false,
+  };
+  console.log('[Gorelo] trying HARDCODED static payload:', JSON.stringify(hardcodedPayload));
+  try {
+    const result = await apiPost('/v1/tickets', hardcodedPayload);
+    console.log('[Gorelo] HARDCODED payload SUCCEEDED - dynamic content is the problem');
+    return result;
+  } catch (hardErr) {
+    console.warn('[Gorelo] HARDCODED payload ALSO failed:', hardErr.message);
+    console.warn('[Gorelo] This means the API key likely lacks ticket-creation scope, or field names are wrong');
+  }
+
+  // Also try dynamic minimal payload for comparison
   const minPayload = {
     TicketTitle: payload.TicketTitle,
     TicketDescription: payload.TicketDescription,
@@ -247,13 +266,13 @@ export async function createTicket(opts) {
     TicketStatusId: payload.TicketStatusId,
     SendTicketCreatedEmail: payload.SendTicketCreatedEmail,
   };
-  console.log('[Gorelo] trying minimal payload:', JSON.stringify(minPayload));
+  console.log('[Gorelo] trying dynamic minimal payload:', JSON.stringify(minPayload));
   try {
     const result = await apiPost('/v1/tickets', minPayload);
-    console.log('[Gorelo] minimal payload SUCCEEDED');
+    console.log('[Gorelo] dynamic minimal payload SUCCEEDED');
     return result;
   } catch (minErr) {
-    console.warn('[Gorelo] minimal payload ALSO failed:', minErr.message);
+    console.warn('[Gorelo] dynamic minimal payload ALSO failed:', minErr.message);
   }
 
   console.log('[Gorelo] trying full payload...');

@@ -214,7 +214,8 @@ export async function createTicket(opts) {
     description = description.substring(0, 1997) + '...';
   }
 
-  // Field names confirmed from Gorelo API spec (no "Ticket" prefix on most fields)
+  // Field names from official Gorelo OpenAPI spec (additionalProperties: false — unknown fields cause 400)
+  // Required fields: Title, TypeId, StatusId, GroupId
   const payload = {
     Title: sanitise(opts.title),
     Description: description,
@@ -222,15 +223,16 @@ export async function createTicket(opts) {
     SourceId: opts.sourceId || 2,
     StatusId: opts.statusId || 1,
     TypeId: opts.typeId || 1,
-    SendCreatedEmail: opts.sendNotification !== false,
+    // GroupId is REQUIRED (single integer, not an array)
+    GroupId: opts.technicianGroupIds?.[0] || opts.groupId || 1,
+    SendTicketCreatedEmail: opts.sendNotification !== false,
   };
 
-  if (opts.clientId)                   payload.ClientId = opts.clientId;
-  if (opts.contactId)                  payload.ContactId = opts.contactId;
-  if (opts.technicianGroupIds?.length) payload.GroupIds = opts.technicianGroupIds;
-  if (opts.assignedToId)               payload.LeadAssigneeId = opts.assignedToId;
-  if (opts.newTags?.length)            payload.NewTagNames = opts.newTags;
-  if (opts.existingTagIds?.length)     payload.TagIds = opts.existingTagIds.map(Number);
+  if (opts.clientId)     payload.ClientId = opts.clientId;
+  if (opts.contactId)    payload.ContactId = opts.contactId;
+  if (opts.assignedToId) payload.LeadAssigneeId = opts.assignedToId;
+  // TagIds: existing tag IDs only (integers). NewTagNames does not exist in the API.
+  if (opts.existingTagIds?.length) payload.TagIds = opts.existingTagIds.map(Number);
 
   console.log('[Gorelo] createTicket payload:', JSON.stringify(payload));
   return apiPost('/v1/tickets', payload);

@@ -256,6 +256,7 @@ function renderTags() {
 // ─── Submit ───────────────────────────────────────────────────────────────────
 
 async function submitTicket() {
+  console.log('[Gorelo] submitTicket called, subject:', getVal('field-subject'), 'groupId:', getVal('field-group'));
   const subject = getVal('field-subject').trim();
   const groupId = getVal('field-group');
 
@@ -412,7 +413,10 @@ async function validateAndSaveApiKey() {
   document.getElementById('field-group').addEventListener('change', e => {
     onGroupChange(e.target.value);
   });
-  document.getElementById('btn-submit').addEventListener('click', submitTicket);
+  const btnSubmit = document.getElementById('btn-submit');
+  console.log('[Gorelo] btn-submit element:', btnSubmit);
+  if (btnSubmit) btnSubmit.addEventListener('click', submitTicket);
+  else console.error('[Gorelo] btn-submit NOT FOUND in DOM');
 
   // Settings
   document.getElementById('btn-validate-key').addEventListener('click', validateAndSaveApiKey);

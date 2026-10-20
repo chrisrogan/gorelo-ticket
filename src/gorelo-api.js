@@ -155,11 +155,15 @@ export async function getTags() {
 export async function getTicketTypes() {
   try {
     const json = await apiGet('/v1/tickets/types?PageSize=200');
-    return unwrap(json).map(t => ({
+    console.log('[Gorelo] getTicketTypes raw:', JSON.stringify(json).substring(0, 500));
+    const items = unwrap(json);
+    console.log('[Gorelo] getTicketTypes unwrapped:', items.length, 'items', JSON.stringify(items).substring(0, 300));
+    return items.map(t => ({
       id: f(t, 'Id', 'id'),
       name: f(t, 'Name', 'name', 'TypeName', 'typeName'),
     }));
-  } catch {
+  } catch (err) {
+    console.error('[Gorelo] getTicketTypes error:', err.message);
     return [];
   }
 }

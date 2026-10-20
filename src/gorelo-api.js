@@ -152,6 +152,18 @@ export async function getTags() {
   }
 }
 
+export async function getTicketTypes() {
+  try {
+    const json = await apiGet('/v1/tickets/types?PageSize=200');
+    return unwrap(json).map(t => ({
+      id: f(t, 'Id', 'id'),
+      name: f(t, 'Name', 'name', 'TypeName', 'typeName'),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function getEmailConfigurations() {
   // Not present in the Public API — return empty array.
   return [];
@@ -222,7 +234,7 @@ export async function createTicket(opts) {
     PriorityId: opts.priorityId || 2,
     SourceId: opts.sourceId || 2,
     StatusId: opts.statusId || 1,
-    TypeId: opts.typeId || 1,
+    TypeId: opts.typeId,  // required; loaded dynamically from /v1/tickets/types
     // GroupId is REQUIRED (single integer, not an array)
     GroupId: opts.technicianGroupIds?.[0] || opts.groupId || 1,
     SendTicketCreatedEmail: opts.sendNotification !== false,

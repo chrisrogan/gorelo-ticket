@@ -10,7 +10,7 @@ const _v = new URL(import.meta.url).searchParams.get('v') || Date.now();
 const { isAuthenticated, validateApiKey } = await import(`../auth/auth.js?v=${_v}`);
 const {
   getClients, getContacts, getTechnicianGroups, getTechnicians,
-  getTags, getEmailConfigurations, createTicket,
+  getTicketTypes, getTags, getEmailConfigurations, createTicket,
   PRIORITIES, SOURCES,
 } = await import(`../gorelo-api.js?v=${_v}`);
 const { getSetting, saveSettings, getAllSettings } = await import(`../settings.js?v=${_v}`);
@@ -74,8 +74,9 @@ async function loadEmailData() {
 // ─── Form dropdowns ───────────────────────────────────────────────────────────
 
 async function loadFormDropdowns() {
-  const [groups, tags, mailboxes] = await Promise.allSettled([
+  const [groups, types, tags, mailboxes] = await Promise.allSettled([
     getTechnicianGroups(),
+    getTicketTypes(),
     getTags(),
     getEmailConfigurations(),
   ]);
@@ -88,6 +89,13 @@ async function loadFormDropdowns() {
       setVal('field-group', String(defaultGroup));
       onGroupChange(String(defaultGroup));  // load assignees for default group
     }
+  }
+
+  if (types.status === 'fulfilled' && types.value.length > 0) {
+    populateSelect('field-type', types.value, 'id', 'name', '', '— Select type —');
+    const defaultType = getSetting('defaultTypeId');
+    if (defaultType) setVal('field-type', String(defaultType));
+    else setVal('field-type', String(types.value[0].id)); // default to first type
   }
 
   // Tags cache
@@ -281,6 +289,7 @@ async function submitTicket() {
       contactId: intVal('field-contact'),
       technicianGroupIds: (groupIdNum && groupIdNum > 0) ? [groupIdNum] : [],
       assignedToId: intVal('field-assignee'),
+      typeId: intVal('field-type') || null,
       priorityId: intVal('field-priority') || 2,
       sourceId: intVal('field-source') || 2,
       emailConfigurationId: intVal('field-mailbox') || null,

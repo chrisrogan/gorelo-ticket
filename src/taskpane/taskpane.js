@@ -146,9 +146,11 @@ async function onClientChange(clientId, preselectContactId) {
 
   try {
     const contacts = await getContacts(clientId || null);
+    console.log('[Gorelo] getContacts(' + clientId + ') returned', contacts.length, 'contacts:', contacts.slice(0,3));
     populateSelect('field-contact', contacts, 'id', 'name', '', '— Select contact —');
     if (preselectContactId) setVal('field-contact', String(preselectContactId));
-  } catch {
+  } catch (err) {
+    console.error('[Gorelo] getContacts error:', err);
     contactSel.innerHTML = '<option value="">— Select contact —</option>';
   }
 }
@@ -159,11 +161,13 @@ async function onGroupChange(groupId) {
 
   try {
     const techs = await getTechnicians(groupId || null);
+    console.log('[Gorelo] getTechnicians(' + groupId + ') returned', techs.length, 'techs:', techs.slice(0,3));
     populateSelect('field-assignee', techs, 'id', 'name', '', '— Unassigned —');
 
     const defaultAssignee = getSetting('defaultAssignedToId');
     if (defaultAssignee) setVal('field-assignee', String(defaultAssignee));
-  } catch {
+  } catch (err) {
+    console.error('[Gorelo] getTechnicians error:', err);
     assigneeSel.innerHTML = '<option value="">— Unassigned —</option>';
   }
 }

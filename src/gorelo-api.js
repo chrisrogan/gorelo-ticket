@@ -230,6 +230,32 @@ export async function createTicket(opts) {
   if (opts.newTags?.length)            payload.NewTicketTags = opts.newTags;
   if (opts.existingTagIds?.length)     payload.OldTicketTags = opts.existingTagIds;
 
+  // Truncate description to avoid hitting Gorelo's field length limit
+  if (payload.TicketDescription && payload.TicketDescription.length > 2000) {
+    payload.TicketDescription = payload.TicketDescription.substring(0, 1997) + '...';
+  }
+
   console.log('[Gorelo] createTicket payload:', JSON.stringify(payload));
+
+  // DIAGNOSTIC: try bare-minimum payload first to isolate whether 400 is
+  // caused by field names/values or by description content
+  const minPayload = {
+    TicketTitle: payload.TicketTitle,
+    TicketDescription: payload.TicketDescription,
+    TicketPriorityId: payload.TicketPriorityId,
+    TicketSourceId: payload.TicketSourceId,
+    TicketStatusId: payload.TicketStatusId,
+    SendTicketCreatedEmail: payload.SendTicketCreatedEmail,
+  };
+  console.log('[Gorelo] trying minimal payload:', JSON.stringify(minPayload));
+  try {
+    const result = await apiPost('/v1/tickets', minPayload);
+    console.log('[Gorelo] minimal payload SUCCEEDED');
+    return result;
+  } catch (minErr) {
+    console.warn('[Gorelo] minimal payload ALSO failed:', minErr.message);
+  }
+
+  console.log('[Gorelo] trying full payload...');
   return apiPost('/v1/tickets', payload);
 }

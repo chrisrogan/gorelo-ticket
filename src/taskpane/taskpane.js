@@ -395,39 +395,40 @@ async function validateAndSaveApiKey() {
 
 // DOM is already ready (module loaded dynamically after DOMContentLoaded)
 ;(() => {
+  console.log('[Gorelo] wiring event listeners');
+  function on(id, event, fn) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(event, fn);
+    else console.warn('[Gorelo] element not found:', id);
+  }
+
   // Header buttons
-  document.getElementById('btn-settings').addEventListener('click', async () => {
+  on('btn-settings', 'click', async () => {
     showView('settings');
     await loadSettingsView();
   });
-  document.getElementById('btn-refresh').addEventListener('click', async () => {
+  on('btn-refresh', 'click', async () => {
     if (currentView === 'form') {
       await loadEmailData();
     }
   });
 
   // Setup view
-  document.getElementById('btn-goto-settings').addEventListener('click', async () => {
+  on('btn-goto-settings', 'click', async () => {
     showView('settings');
     await loadSettingsView();
   });
 
   // Form
-  document.getElementById('field-client').addEventListener('change', e => {
-    onClientChange(e.target.value);
-  });
-  document.getElementById('field-group').addEventListener('change', e => {
-    onGroupChange(e.target.value);
-  });
-  const btnSubmit = document.getElementById('btn-submit');
-  console.log('[Gorelo] btn-submit element:', btnSubmit);
-  if (btnSubmit) btnSubmit.addEventListener('click', submitTicket);
-  else console.error('[Gorelo] btn-submit NOT FOUND in DOM');
+  on('field-client', 'change', e => { onClientChange(e.target.value); });
+  on('field-group',  'change', e => { onGroupChange(e.target.value); });
+  on('btn-submit',   'click',  submitTicket);
+  console.log('[Gorelo] btn-submit element:', document.getElementById('btn-submit'));
 
   // Settings
-  document.getElementById('btn-validate-key').addEventListener('click', validateAndSaveApiKey);
-  document.getElementById('btn-save-settings').addEventListener('click', saveSettingsFromUI);
-  document.getElementById('btn-back').addEventListener('click', async () => {
+  on('btn-validate-key',  'click', validateAndSaveApiKey);
+  on('btn-save-settings', 'click', saveSettingsFromUI);
+  on('btn-back', 'click', async () => {
     if (isAuthenticated()) {
       showView('form');
     } else {

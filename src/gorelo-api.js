@@ -203,8 +203,11 @@ export async function createTicket(opts) {
   function sanitise(str) {
     if (!str) return '';
     return str
-      .replace(/[\u00ad\u200b-\u200f\u2028\u2029\ufeff\u180e]/g, '')
-      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+      .replace(/<[^>]*>/g, ' ')                                              // strip HTML tags
+      .replace(/&[a-z]+;|&#[0-9]+;|&#x[0-9a-f]+;/gi, ' ')                  // HTML entities
+      .replace(/[\u00ad\u200b-\u200f\u2028\u2029\ufeff\u180e]/g, '') // soft-hyphen, ZWS
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '') // C0 controls
+      .replace(/\s+/g, ' ')                                                  // collapse whitespace
       .trim();
   }
 
@@ -220,9 +223,8 @@ export async function createTicket(opts) {
 
   // Only include optional fields when they have values
   if (opts.clientId)                   payload.ClientId = opts.clientId;
-  if (opts.clientName)                 payload.ClientName = opts.clientName;
   if (opts.contactId)                  payload.ContactId = opts.contactId;
-  if (opts.technicianGroupIds?.length) payload.TechnicianGroupIds = opts.technicianGroupIds;
+  if (opts.technicianGroupIds?.length) payload.TechnicianGroupId = opts.technicianGroupIds[0];
   if (opts.assignedToId)               payload.AssignedToId = opts.assignedToId;
   if (opts.emailConfigurationId)       payload.EmailConfigurationId = opts.emailConfigurationId;
   if (opts.newTags?.length)            payload.NewTicketTags = opts.newTags;

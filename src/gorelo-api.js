@@ -198,28 +198,25 @@ export const SOURCES = [
  * @param {boolean}  [opts.sendNotification]
  */
 export async function createTicket(opts) {
+  // Build payload omitting null/empty optional fields to avoid Gorelo 400s
   const payload = {
     TicketTitle: opts.title,
     TicketDescription: opts.description || '',
-    MarkdownComment: opts.markdownComment || opts.description || '',
-    ClientId: opts.clientId || null,
-    ClientName: opts.clientName || '',
-    ContactId: opts.contactId || null,
-    OutboundContactEmail: opts.outboundContactEmail || '',
-    TechnicianGroupIds: opts.technicianGroupIds || [],
-    AssignedToId: opts.assignedToId || null,
     TicketPriorityId: opts.priorityId || 2,
-    TicketSeverityId: null,
     TicketSourceId: opts.sourceId || 2,
     TicketStatusId: 1,
-    EmailConfigurationId: opts.emailConfigurationId || null,
-    TicketLocation: opts.ticketLocation || 0,
-    NewTicketTags: opts.newTags || [],
-    OldTicketTags: opts.existingTagIds || [],
-    TicketDeviceIds: [],
     SendTicketCreatedEmail: opts.sendNotification !== false,
-    IsFromWeb: true,
   };
+
+  // Only include optional fields when they have values
+  if (opts.clientId)                   payload.ClientId = opts.clientId;
+  if (opts.clientName)                 payload.ClientName = opts.clientName;
+  if (opts.contactId)                  payload.ContactId = opts.contactId;
+  if (opts.technicianGroupIds?.length) payload.TechnicianGroupIds = opts.technicianGroupIds;
+  if (opts.assignedToId)               payload.AssignedToId = opts.assignedToId;
+  if (opts.emailConfigurationId)       payload.EmailConfigurationId = opts.emailConfigurationId;
+  if (opts.newTags?.length)            payload.NewTicketTags = opts.newTags;
+  if (opts.existingTagIds?.length)     payload.OldTicketTags = opts.existingTagIds;
 
   console.log('[Gorelo] createTicket payload:', JSON.stringify(payload));
   return apiPost('/v1/tickets', payload);

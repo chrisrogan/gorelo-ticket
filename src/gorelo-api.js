@@ -198,10 +198,20 @@ export const SOURCES = [
  * @param {boolean}  [opts.sendNotification]
  */
 export async function createTicket(opts) {
+  // Strip problematic Unicode (zero-width spaces, soft hyphens, BOM, C0 controls)
+  // that cause Gorelo's API to return 400 "Invalid or malformed request body"
+  function sanitise(str) {
+    if (!str) return '';
+    return str
+      .replace(/[\u00ad\u200b-\u200f\u2028\u2029\ufeff\u180e]/g, '')
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+      .trim();
+  }
+
   // Build payload omitting null/empty optional fields to avoid Gorelo 400s
   const payload = {
-    TicketTitle: opts.title,
-    TicketDescription: opts.description || '',
+    TicketTitle: sanitise(opts.title),
+    TicketDescription: sanitise(opts.description),
     TicketPriorityId: opts.priorityId || 2,
     TicketSourceId: opts.sourceId || 2,
     TicketStatusId: 1,

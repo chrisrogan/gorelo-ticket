@@ -152,19 +152,30 @@ export async function getTags() {
   }
 }
 
+// Fallback types shown when Gorelo's Ticket Types feature is disabled (API returns 403)
+const FALLBACK_TICKET_TYPES = [
+  { id: null, name: 'Incident' },
+  { id: null, name: 'Request' },
+  { id: null, name: 'Proactive' },
+  { id: null, name: 'Internal' },
+];
+
 export async function getTicketTypes() {
   try {
     const json = await apiGet('/v1/tickets/types?PageSize=200');
-    console.log('[Gorelo] getTicketTypes raw:', JSON.stringify(json).substring(0, 500));
     const items = unwrap(json);
-    console.log('[Gorelo] getTicketTypes unwrapped:', items.length, 'items', JSON.stringify(items).substring(0, 300));
+    if (items.length === 0) {
+      console.warn('[Gorelo] getTicketTypes returned 0 items — using fallback types');
+      return FALLBACK_TICKET_TYPES;
+    }
     return items.map(t => ({
       id: f(t, 'Id', 'id'),
       name: f(t, 'Name', 'name', 'TypeName', 'typeName'),
     }));
   } catch (err) {
-    console.error('[Gorelo] getTicketTypes error:', err.message);
-    return [];
+    // 403 = Ticket Types feature disabled in Gorelo; use known fallback list
+    console.warn('[Gorelo] getTicketTypes unavailable (' + err.message.substring(0, 80) + ') — using fallback types');
+    return FALLBACK_TICKET_TYPES;
   }
 }
 
@@ -238,7 +249,8 @@ export async function createTicket(opts) {
     PriorityId: opts.priorityId || 2,
     SourceId: opts.sourceId || 2,
     StatusId: opts.statusId || 1,
-    TypeId: opts.typeId,  // required; loaded dynamically from /v1/tickets/types
+    // TypeId: required when Ticket Types feature is enabled; omit (undefined) when disabled
+    ...(opts.typeId != null ? { TypeId: opts.typeId } : {}),
     // GroupId is REQUIRED (single integer, not an array)
     GroupId: opts.technicianGroupIds?.[0] || opts.groupId || 1,
     SendTicketCreatedEmail: opts.sendNotification !== false,

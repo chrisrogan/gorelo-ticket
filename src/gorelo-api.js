@@ -12,7 +12,7 @@
    - Tickets:   POST /v1/tickets
 */
 
-import { getApiKey } from './auth/auth.js?v=2';
+import { getApiKey } from './auth/auth.js?v=3';
 
 const BASE = 'https://gorelo-proxy.chris-rogan.workers.dev';
 

@@ -59,11 +59,18 @@ async function apiPost(path, body) {
   return json.Data ?? json;
 }
 
-/** Unwrap Data array from standard response */
+/** Unwrap Data array from standard Gorelo response.
+ *  Handles two shapes:
+ *   - { Data: [...] }                 — simple list
+ *   - { Data: { Items: [...] } }      — paginated list
+ */
 function unwrap(json) {
   const data = json.Data ?? json.data ?? json;
-  const arr = Array.isArray(data) ? data : [];
-  return arr;
+  // Paginated: { Items: [...], TotalCount: N }
+  if (data && !Array.isArray(data) && Array.isArray(data.Items ?? data.items)) {
+    return data.Items ?? data.items;
+  }
+  return Array.isArray(data) ? data : [];
 }
 
 // ─── Lookups ─────────────────────────────────────────────────────────────────

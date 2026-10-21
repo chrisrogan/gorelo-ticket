@@ -163,7 +163,7 @@ const FALLBACK_TICKET_TYPES = [
 
 export async function getTicketTypes() {
   try {
-    const json = await apiGet('/v1/tickets/types?PageSize=200');
+    const json = await apiGet('/v1/tickets/types');
     const items = unwrap(json);
     if (items.length === 0) {
       console.warn('[Gorelo] getTicketTypes returned 0 items — using fallback types');

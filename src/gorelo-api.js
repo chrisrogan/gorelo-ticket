@@ -63,9 +63,6 @@ async function apiPost(path, body) {
 function unwrap(json) {
   const data = json.Data ?? json.data ?? json;
   const arr = Array.isArray(data) ? data : [];
-  if (arr.length > 0) {
-    console.log('[Gorelo] sample item keys:', Object.keys(arr[0]));
-  }
   return arr;
 }
 
@@ -229,11 +226,27 @@ export async function createTicket(opts) {
   function sanitise(str) {
     if (!str) return '';
     return str
-      .replace(/<[^>]*>/g, ' ')
+      // Convert block-level and line-break tags to newlines before stripping
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|li|tr|blockquote|h[1-6])>/gi, '\n')
+      // Strip remaining HTML tags
+      .replace(/<[^>]*>/g, '')
+      // Decode common HTML entities
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;|&apos;/gi, "'")
       .replace(/&[a-z]+;|&#[0-9]+;|&#x[0-9a-f]+;/gi, ' ')
+      // Remove zero-width and Unicode formatting characters
       .replace(/[\u00ad\u200b-\u200f\u2028\u2029\ufeff\u180e]/g, '')
+      // Remove C0 control characters (keep tab \t, newline \n, carriage return \r)
       .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
-      .replace(/\s+/g, ' ')
+      // Collapse runs of spaces/tabs on each line (preserve newlines)
+      .replace(/[ \t]+/g, ' ')
+      // Collapse 3+ consecutive newlines to 2
+      .replace(/\n{3,}/g, '\n\n')
       .trim();
   }
 
@@ -262,6 +275,5 @@ export async function createTicket(opts) {
   // TagIds: existing tag IDs only (integers). NewTagNames does not exist in the API.
   if (opts.existingTagIds?.length) payload.TagIds = opts.existingTagIds.map(Number);
 
-  console.log('[Gorelo] createTicket payload:', JSON.stringify(payload));
   return apiPost('/v1/tickets', payload);
 }

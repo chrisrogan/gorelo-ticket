@@ -1,7 +1,6 @@
 /* taskpane.js — Full task pane controller.
    Handles the Create Ticket form and Settings view. */
 
-console.log('[Gorelo] taskpane.js module start');
 
 // Extract the cache-busting ?v= param that taskpane.html injected into our URL.
 // This ensures all sub-modules are also fetched with the same fresh timestamp.
@@ -159,7 +158,6 @@ async function onClientChange(clientId, preselectContactId) {
 
   try {
     const contacts = await getContacts(clientId || null);
-    console.log('[Gorelo] getContacts(' + clientId + ') returned', contacts.length, 'contacts:', contacts.slice(0,3));
     populateSelect('field-contact', contacts, 'id', 'name', '', '— Select contact —');
     if (preselectContactId) setVal('field-contact', String(preselectContactId));
   } catch (err) {
@@ -174,7 +172,6 @@ async function onGroupChange(groupId) {
 
   try {
     const techs = await getTechnicians(groupId || null);
-    console.log('[Gorelo] getTechnicians(' + groupId + ') returned', techs.length, 'techs:', techs.slice(0,3));
     populateSelect('field-assignee', techs, 'id', 'name', '', '— Unassigned —');
 
     const defaultAssignee = getSetting('defaultAssignedToId');
@@ -273,7 +270,6 @@ function renderTags() {
 // ─── Submit ───────────────────────────────────────────────────────────────────
 
 async function submitTicket() {
-  console.log('[Gorelo] submitTicket called, subject:', getVal('field-subject'), 'groupId:', getVal('field-group'));
   const subject = getVal('field-subject').trim();
   const groupId = getVal('field-group');
 
@@ -412,7 +408,6 @@ async function validateAndSaveApiKey() {
 
 // DOM is already ready (module loaded dynamically after DOMContentLoaded)
 ;(() => {
-  console.log('[Gorelo] wiring event listeners');
   function on(id, event, fn) {
     const el = document.getElementById(id);
     if (el) el.addEventListener(event, fn);
@@ -440,7 +435,6 @@ async function validateAndSaveApiKey() {
   on('field-client', 'change', e => { onClientChange(e.target.value); });
   on('field-group',  'change', e => { onGroupChange(e.target.value); });
   on('btn-submit',   'click',  submitTicket);
-  console.log('[Gorelo] btn-submit element:', document.getElementById('btn-submit'));
 
   // Settings
   on('btn-validate-key',  'click', validateAndSaveApiKey);

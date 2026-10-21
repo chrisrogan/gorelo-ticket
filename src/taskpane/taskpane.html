@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v20261021104500 -->
+<!-- v20261021105500 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -465,7 +465,7 @@
     <div class="toggle-row">
       <span class="toggle-label">Send ticket notification email</span>
       <label class="toggle">
-        <input type="checkbox" id="toggle-notify" checked />
+        <input type="checkbox" id="toggle-notify" />
         <span class="toggle-slider"></span>
       </label>
     </div>
@@ -514,6 +514,13 @@
     </div>
 
     <div class="form-group">
+      <label>Default Type</label>
+      <select id="settings-default-type">
+        <option value="">— None —</option>
+      </select>
+    </div>
+
+    <div class="form-group">
       <label>Default Priority</label>
       <select id="settings-default-priority"></select>
     </div>
@@ -534,6 +541,14 @@
       <span class="toggle-label">Auto-open task pane on email open</span>
       <label class="toggle">
         <input type="checkbox" id="settings-auto-open" />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <span class="toggle-label">Send notification email by default</span>
+      <label class="toggle">
+        <input type="checkbox" id="settings-default-notify" />
         <span class="toggle-slider"></span>
       </label>
     </div>

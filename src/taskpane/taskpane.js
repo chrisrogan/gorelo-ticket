@@ -117,6 +117,9 @@ async function loadFormDropdowns() {
   populateSelect('field-source', SOURCES, 'id', 'name');
   setVal('field-source', String(getSetting('defaultSourceId') || 2));
 
+  // Apply notify default (off unless explicitly enabled in settings)
+  document.getElementById('toggle-notify').checked = !!getSetting('defaultSendNotification');
+
   // Load clients
   await loadClients();
 }
@@ -328,10 +331,11 @@ async function loadSettingsView() {
 
   // Load dropdowns for defaults
   try {
-    const [groups, techs, mailboxes] = await Promise.allSettled([
+    const [groups, techs, mailboxes, types] = await Promise.allSettled([
       getTechnicianGroups(),
       getTechnicians(),
       getEmailConfigurations(),
+      getTicketTypes(),
     ]);
 
     if (groups.status === 'fulfilled') {
@@ -343,12 +347,16 @@ async function loadSettingsView() {
     if (mailboxes.status === 'fulfilled') {
       populateSelect('settings-default-mailbox', mailboxes.value, 'id', 'name', settings.defaultEmailConfigurationId || '', '— None —');
     }
+    if (types.status === 'fulfilled') {
+      populateSelect('settings-default-type', types.value, 'id', 'name', settings.defaultTypeId || '', '— None —');
+    }
   } catch { /* non-fatal */ }
 
   populateSelect('settings-default-priority', PRIORITIES, 'id', 'name', settings.defaultPriorityId || 2);
   populateSelect('settings-default-source', SOURCES, 'id', 'name', settings.defaultSourceId || 2);
 
   document.getElementById('settings-auto-open').checked = !!settings.autoOpenTaskPane;
+  document.getElementById('settings-default-notify').checked = !!settings.defaultSendNotification;
 }
 
 async function saveSettingsFromUI() {
@@ -361,6 +369,8 @@ async function saveSettingsFromUI() {
       defaultPriorityId: intVal('settings-default-priority') || 2,
       defaultSourceId: intVal('settings-default-source') || 2,
       defaultEmailConfigurationId: getVal('settings-default-mailbox'),
+      defaultTypeId: intVal('settings-default-type') || null,
+      defaultSendNotification: document.getElementById('settings-default-notify').checked,
       autoOpenTaskPane: document.getElementById('settings-auto-open').checked,
     });
     showSettingsAlert('✓ Defaults saved.', 'success');

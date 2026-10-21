@@ -152,12 +152,13 @@ export async function getTags() {
   }
 }
 
-// Fallback types shown when Gorelo's Ticket Types feature is disabled (API returns 403)
+// Hardcoded ticket type IDs (instance-specific; discovered from Gorelo network traffic 2026-10-21)
+// These are used when the Ticket Types API returns 403 (feature toggled off in Gorelo settings)
 const FALLBACK_TICKET_TYPES = [
-  { id: null, name: 'Incident' },
-  { id: null, name: 'Request' },
-  { id: null, name: 'Proactive' },
-  { id: null, name: 'Internal' },
+  { id: 11930, name: 'Incident' },
+  { id: 11931, name: 'Request' },
+  { id: 11932, name: 'Proactive' },
+  { id: 11933, name: 'Internal' },
 ];
 
 export async function getTicketTypes() {
@@ -249,8 +250,7 @@ export async function createTicket(opts) {
     PriorityId: opts.priorityId || 2,
     SourceId: opts.sourceId || 2,
     StatusId: opts.statusId || 1,
-    // TypeId: required when Ticket Types feature is enabled; omit (undefined) when disabled
-    ...(opts.typeId != null ? { TypeId: opts.typeId } : {}),
+    TypeId: opts.typeId,  // required; from fallback list or live API
     // GroupId is REQUIRED (single integer, not an array)
     GroupId: opts.technicianGroupIds?.[0] || opts.groupId || 1,
     SendTicketCreatedEmail: opts.sendNotification !== false,

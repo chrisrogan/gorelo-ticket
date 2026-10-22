@@ -108,6 +108,36 @@ export async function getContacts(clientId) {
   });
 }
 
+export async function searchContacts(query) {
+  // Query is matched against email, first name, and last name
+  const json = await apiGet(`/v1/contacts?Query=${encodeURIComponent(query)}&PageSize=10`);
+  return unwrap(json).map(c => {
+    const first = f(c, 'FirstName', 'firstName');
+    const last  = f(c, 'LastName',  'lastName');
+    const email = f(c, 'PrimaryEmail', 'primaryEmail', 'emailAddress', 'EmailAddress');
+    return {
+      id:       f(c, 'Id', 'id', 'contactId', 'ContactId'),
+      name:     [first, last].filter(Boolean).join(' ') || email || `Contact #${c.Id || c.id}`,
+      clientId: f(c, 'ClientId', 'clientId'),
+      email,
+    };
+  });
+}
+
+export async function createContact({ firstName, lastName, email, clientId }) {
+  const payload = { FirstName: firstName, LastName: lastName, PrimaryEmail: email };
+  if (clientId) payload.ClientId = Number(clientId);
+  const json = await apiPost('/v1/contacts', payload);
+  // Response is { Data: { Id, ... } }
+  const data = json.Data ?? json;
+  return {
+    id:       f(data, 'Id', 'id', 'contactId', 'ContactId'),
+    name:     [firstName, lastName].filter(Boolean).join(' ') || email,
+    clientId: clientId || null,
+    email,
+  };
+}
+
 export async function getTechnicianGroups() {
   const json = await apiGet('/v1/organization/groups');
   return unwrap(json).map(g => ({

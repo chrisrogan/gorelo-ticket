@@ -8,7 +8,8 @@ const _v = new URL(import.meta.url).searchParams.get('v') || Date.now();
 
 const { isAuthenticated, validateApiKey } = await import(`../auth/auth.js?v=${_v}`);
 const {
-  getClients, getContacts, getTechnicianGroups, getTechnicians,
+  getClients, getContacts, searchContacts, createContact,
+  getTechnicianGroups, getTechnicians,
   getTicketTypes, getTags, getEmailConfigurations, createTicket,
   PRIORITIES, SOURCES,
 } = await import(`../gorelo-api.js?v=${_v}`);
@@ -139,17 +140,71 @@ async function loadClients() {
 }
 
 async function tryAutoMatchClient(email, clients) {
-  // Try to find a contact with matching email, which tells us the client
+  // Search contacts by sender email — fast targeted lookup
   try {
-    const contacts = await getContacts();
-    const match = contacts.find(c =>
-      (c.email || '').toLowerCase() === email.toLowerCase()
-    );
+    const matches = await searchContacts(email);
+    const match = matches.find(c => (c.email || '').toLowerCase() === email.toLowerCase());
     if (match?.clientId) {
       setVal('field-client', String(match.clientId));
       await onClientChange(match.clientId, match.id);
+    } else if (match) {
+      // Contact exists but is temporary (no client yet) — still pre-select them
+      await onClientChange(null, match.id);
     }
-  } catch { /* non-fatal */ }
+    // Store the match result so the contact section can use it
+    window._senderContact = match || null;
+  } catch {
+    window._senderContact = null;
+  }
+  updateCreateContactButton(email);
+}
+
+function updateCreateContactButton(senderEmail) {
+  const btn = document.getElementById('btn-create-contact');
+  const hint = document.getElementById('create-contact-hint');
+  if (!btn) return;
+  if (!senderEmail) { btn.style.display = 'none'; return; }
+  if (window._senderContact) {
+    // Already exists — hide button, show hint
+    btn.style.display = 'none';
+    if (hint) { hint.textContent = '✓ Contact found in Gorelo'; hint.style.display = 'block'; }
+  } else {
+    // Not found — show create button
+    btn.style.display = 'inline-block';
+    if (hint) hint.style.display = 'none';
+  }
+}
+
+async function handleCreateContact() {
+  const btn = document.getElementById('btn-create-contact');
+  const hint = document.getElementById('create-contact-hint');
+  const fromRaw = getVal('field-from');       // "Display Name <email@example.com>"
+  const clientId = intVal('field-client');
+
+  // Parse display name and email from the From field
+  const emailMatch = fromRaw.match(/<([^>]+)>/);
+  const email = emailMatch ? emailMatch[1].trim() : fromRaw.trim();
+  const displayName = emailMatch ? fromRaw.replace(/<[^>]+>/, '').trim() : '';
+  const nameParts = displayName.split(/\s+/);
+  const firstName = nameParts[0] || email.split('@')[0];
+  const lastName  = nameParts.slice(1).join(' ') || '—';
+
+  if (!email) { showError('Cannot determine sender email address.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+  try {
+    const contact = await createContact({ firstName, lastName, email, clientId: clientId || null });
+    window._senderContact = contact;
+    // Refresh the contact dropdown and select the new contact
+    await onClientChange(clientId || null, contact.id);
+    btn.style.display = 'none';
+    if (hint) { hint.textContent = '✓ Contact created in Gorelo'; hint.style.display = 'block'; }
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = '+ Create contact';
+    showError('Could not create contact: ' + err.message);
+  }
 }
 
 async function onClientChange(clientId, preselectContactId) {
@@ -433,6 +488,7 @@ async function validateAndSaveApiKey() {
 
   // Form
   on('field-client', 'change', e => { onClientChange(e.target.value); });
+  on('btn-create-contact', 'click', handleCreateContact);
   on('field-group',  'change', e => { onGroupChange(e.target.value); });
   on('btn-submit',   'click',  submitTicket);
 

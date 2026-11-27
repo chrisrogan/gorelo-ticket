@@ -189,7 +189,7 @@ async function handleCreateContact() {
   const firstName = nameParts[0] || email.split('@')[0];
   const lastName  = nameParts.slice(1).join(' ') || '—';
 
-  if (!email) { showError('Cannot determine sender email address.'); return; }
+  if (!email) { showFormAlert('Cannot determine sender email address.', 'error'); return; }
 
   btn.disabled = true;
   btn.textContent = 'Creating…';
@@ -203,7 +203,7 @@ async function handleCreateContact() {
   } catch (err) {
     btn.disabled = false;
     btn.textContent = '+ Create contact';
-    showError('Could not create contact: ' + err.message);
+    showFormAlert('Could not create contact: ' + err.message, 'error');
   }
 }
 
